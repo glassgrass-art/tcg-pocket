@@ -2,100 +2,97 @@ export default async function handler(req, res) {
   const { rarity = '', setId = '' } = req.query;
 
   try {
-    const knownSets = [
-      'A1', 'A1a', 'A2', 'A2a', 'A2b', 'A3', 'A3a', 'A3b', 'A4', 'A4a', 'A4b',
-      'B1', 'B1a', 'B2', 'B2a', 'B2b', 'B3', 'B3a', 'B3b', 'B4', 'B4a', 
-      'P-A'
-    ];
+    // 直接调取 GitHub 上开源社区维持的手游原生 JSON 数据库 (包含准确 rarity)
+    const DATA_URL = 'https://raw.githubusercontent.com/chase-mew/pokemon-tcg-pocket-cards/main/data/v4/cards.json';
     
-    const targetSets = setId ? [setId] : knownSets;
+    const response = await fetch(DATA_URL, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(8000)
+    });
 
-    // 拉取 Set 数据
-    const fetchSetData = async (id) => {
-      try {
-        const res = await fetch(`https://api.tcgdex.net/v2/en/sets/${id}`, { signal: AbortSignal.timeout(5000) });
-        if (res.ok) return await res.json();
-      } catch (err) {
-        console.warn(`Set ${id} fetch failed.`);
-      }
-      return null;
-    };
+    if (!response.ok) {
+      throw new Error(`GitHub Data Fetch Failed: ${response.status}`);
+    }
 
-    const setsData = (await Promise.all(targetSets.map(fetchSetData))).filter(Boolean);
+    const allCards = await response.json();
 
-    // 稀有度归一化函数
+    // 稀有度归一化函数 (精准匹配客户端原生的稀有度字符串)
     function normalizeRarity(str) {
       if (!str) return '';
-      const s = str.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (s.includes('1diamond') || s === 'onediamond' || s === 'common' || s === 'c') return '1diamond';
-      if (s.includes('2diamond') || s === 'twodiamond' || s === 'uncommon' || s === 'uc') return '2diamond';
-      if (s.includes('3diamond') || s === 'threediamond' || s === 'rare' || s === 'r') return '3diamond';
-      if (s.includes('4diamond') || s === 'fourdiamond' || s === 'doublerare' || s === 'rr') return '4diamond';
-      if (s.includes('1star') || s === 'onestar' || s === 'ar' || s === 'illustrationrare') return '1star';
-      if (s.includes('2star') || s === 'twostar' || s === 'sar' || s === 'sr' || s === 'specialillustrationrare') return '2star';
-      if (s.includes('3star') || s === 'threestar' || s === 'ur' || s === 'immersive') return '3star';
-      if (s.includes('crown') || s === 'crownrare') return 'crown';
+      const s = str.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+      
+      if (s.includes('1diamond') || s.includes('onediamond') || s === 'common' || s === '♦') return '1diamond';
+      if (s.includes('2diamond') || s.includes('twodiamond') || s === 'uncommon' || s === '♦♦') return '2diamond';
+      if (s.includes('3diamond') || s.includes('threediamond') || s === 'rare' || s === '♦♦♦') return '3diamond';
+      if (s.includes('4diamond') || s.includes('fourdiamond') || s.includes('doublerare') || s === '♦♦♦♦') return '4diamond';
+      
+      if (s.includes('1star') || s.includes('onestar') || s === '★') return '1star';
+      if (s.includes('2star') || s.includes('twostar') || s === '★★') return '2star';
+      if (s.includes('3star') || s.includes('threestar') || s === '★★★') return '3star';
+      if (s.includes('crown') || s.includes('👑')) return 'crown';
+      
       return s;
     }
 
     const targetNormRarity = rarity ? normalizeRarity(rarity) : '';
 
-    let result = [];
+    // 按扩展包分组
+    const setsMap = {};
 
-    for (const setData of setsData) {
-      if (!setData || !setData.cards) continue;
+    allCards.forEach(card => {
+      // 获取卡片所属扩展包 ID (如 A1, A1a, B4a 等)
+      const currentSetId = card.set_id || card.setId || (card.id ? card.id.split('-')[0] : 'Other');
+      const currentSetName = card.set_name || card.setName || currentSetId;
+      const rawRarity = card.rarity || card.rarity_name || '';
+      const normRarity = normalizeRarity(rawRarity);
 
-      // 1. 整理基本卡牌数据
-      let formattedCards = setData.cards.map(card => {
-        const rawRarity = card.rarity || '';
-        return {
-          id: card.id,
-          localId: card.localId || card.id.split('-').pop(),
-          name: card.name,
-          setId: setData.id,
-          setName: setData.name || setData.id,
-          rarity: rawRarity,
-          normRarity: normalizeRarity(rawRarity),
-          image: card.image ? `${card.image}/low.webp` : '',
-          highImage: card.image ? `${card.image}/high.webp` : ''
-        };
-      });
-
-      // 2. 如果卡牌缺少 rarity 属性，通过 Pocket 的序号结构做算法智能推定（避免全变成 1diamond）
-      // 在 Pocket 中：一般前段为 1-4 菱形，后段/超发编号为 星级 与 Crown 皇冠
-      formattedCards = formattedCards.map(c => {
-        if (c.normRarity) return c;
-        
-        // 基于 localId 结构的兜底规则（如果 API 没给 rarity）
-        const num = parseInt(c.localId, 10);
-        let guessed = '1diamond';
-        if (!isNaN(num)) {
-          if (c.name.toLowerCase().includes('ex')) guessed = '4diamond';
-          else if (num > 200) guessed = '1star';
-        }
-        return { ...c, normRarity: guessed };
-      });
-
-      // 3. 严格按稀有度进行过滤（删除了强制降级为全显示的逻辑）
-      let filteredCards = targetNormRarity
-        ? formattedCards.filter(c => c.normRarity === targetNormRarity)
-        : formattedCards;
-
-      if (filteredCards.length > 0) {
-        result.push({
-          setId: setData.id,
-          setName: setData.name || setData.id,
-          totalCards: filteredCards.length,
-          cards: filteredCards
-        });
+      // 如果有筛选稀有度，且当前卡牌稀有度不符，直接跳过
+      if (targetNormRarity && normRarity !== targetNormRarity) {
+        return;
       }
-    }
+
+      // 指定了 setId 时，跳过其他包
+      if (setId && currentSetId.toLowerCase() !== setId.toLowerCase()) {
+        return;
+      }
+
+      if (!setsMap[currentSetId]) {
+        setsMap[currentSetId] = {
+          setId: currentSetId,
+          setName: currentSetName,
+          cards: []
+        };
+      }
+
+      // 图片路径兜底
+      let imgUrl = card.image || card.image_url || '';
+      if (!imgUrl && card.id) {
+        imgUrl = `https://assets.tcgdex.net/en/tcgp/${currentSetId}/${card.local_id || card.id.split('-')[1]}/low.webp`;
+      }
+
+      setsMap[currentSetId].cards.push({
+        id: card.id,
+        name: card.name,
+        setId: currentSetId,
+        setName: currentSetName,
+        rarity: rawRarity,
+        normRarity: normRarity,
+        image: imgUrl,
+        highImage: imgUrl.replace('/low.webp', '/high.webp')
+      });
+    });
+
+    const result = Object.values(setsMap).map(set => ({
+      ...set,
+      totalCards: set.cards.length
+    }));
 
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
     res.status(200).json({ data: result });
+
   } catch (error) {
-    console.error('API Error:', error);
-    res.status(500).json({ error: 'Failed to fetch cards' });
+    console.error('API Router Error:', error);
+    res.status(500).json({ error: 'Failed to fetch cards database', details: error.message });
   }
 }
