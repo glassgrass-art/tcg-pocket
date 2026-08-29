@@ -5,58 +5,88 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pokémon TCG Pocket 卡牌交换匹配器</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 保持卡牌 2:3 标准比例 */
+    .card-aspect {
+      aspect-ratio: 2.5 / 3.5;
+    }
+    /* 卡牌悬停 3D 微抬效果 */
+    .card-hover-effect {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card-hover-effect:hover {
+      transform: translateY(-6px) scale(1.02);
+      box-shadow: 0 12px 24px -6px rgba(250, 204, 21, 0.25);
+    }
+  </style>
 </head>
 <body class="bg-slate-900 text-white min-h-screen p-6">
   <div class="max-w-7xl mx-auto">
     <!-- 头部 -->
     <header class="mb-6 text-center">
       <h1 class="text-3xl font-bold tracking-wide text-yellow-400">Pokémon TCG Pocket Trade Matcher</h1>
-      <p class="text-slate-400 mt-1">精准按卡图与卡号匹配同名卡交换</p>
+      <p class="text-slate-400 mt-1">高清大图画风对比 | 点击卡片查看原图 | 锁定稀有度对等交换</p>
     </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <!-- 左侧：卡牌检索 -->
+      <!-- 左侧：高清卡牌网格展示 -->
       <div class="lg:col-span-2">
         <div class="flex flex-col sm:flex-row gap-4 mb-6">
           <input 
             type="text" 
             id="searchInput" 
-            placeholder="搜索要交换的卡牌..." 
-            class="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-yellow-400"
+            placeholder="搜索卡牌名称 / 编号 (例如 Pikachu 或 A1-001)..." 
+            class="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:outline-none focus:border-yellow-400 text-sm shadow-inner"
           />
         </div>
-        <div id="cardsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+
+        <!-- 调整为响应式网格：自适应大图展示 -->
+        <div id="cardsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-5"></div>
       </div>
 
       <!-- 右侧：交换愿望单 -->
-      <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 h-fit sticky top-6 space-y-6">
-        <!-- 我想要的 (Want) -->
+      <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 h-fit sticky top-6 space-y-6 shadow-xl">
+        <!-- 我 wanted 的 (Want) -->
         <div>
-          <div class="flex justify-between items-center mb-2">
-            <h2 class="text-lg font-bold text-yellow-400">🟡 第一步：我想要的 (Want)</h2>
-            <span id="rarityBadge" class="text-xs text-slate-400"></span>
+          <div class="flex justify-between items-center mb-3">
+            <h2 class="text-base font-bold text-yellow-400 flex items-center gap-1.5">
+              <span>🟡 我想要的</span>
+              <span class="text-xs font-normal text-slate-400">(Want)</span>
+            </h2>
+            <span id="rarityBadge"></span>
           </div>
-          <div id="wantList" class="space-y-2 min-h-[80px] bg-slate-900/50 p-2 rounded border border-slate-700/50">
-            <p class="text-slate-500 text-xs text-center py-6">点击下方卡牌 "+ 想要 (Want)"</p>
+          <div id="wantList" class="space-y-2.5 min-h-[90px] bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+            <p class="text-slate-500 text-xs text-center py-6">第一步：点击左侧卡牌 "+ 想要"</p>
           </div>
         </div>
 
         <!-- 我拥有的 (Have) -->
         <div>
-          <h2 class="text-lg font-bold text-green-400 mb-2">🟢 第二步：我有的 (Have)</h2>
-          <div id="haveList" class="space-y-2 min-h-[80px] bg-slate-900/50 p-2 rounded border border-slate-700/50">
-            <p class="text-slate-500 text-xs text-center py-6">锁定稀有度后选择重复卡</p>
+          <h2 class="text-base font-bold text-green-400 mb-3 flex items-center gap-1.5">
+            <span>🟢 我有的</span>
+            <span class="text-xs font-normal text-slate-400">(Have/Dupe)</span>
+          </h2>
+          <div id="haveList" class="space-y-2.5 min-h-[90px] bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
+            <p class="text-slate-500 text-xs text-center py-6">第二步：选择同稀有度的重复卡</p>
           </div>
         </div>
 
         <!-- 导出一键贴 -->
         <button 
           onclick="exportTradePost()" 
-          class="w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold rounded-lg transition"
+          class="w-full py-3 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold rounded-xl shadow-lg transition duration-200 active:scale-95"
         >
-          复制交换帖 (带唯一编号)
+          复制交换帖 (带图片和卡号验证)
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- 全屏大图 Preview Modal -->
+  <div id="imageModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" onclick="closeModal()">
+    <div class="relative max-w-md w-full flex flex-col items-center">
+      <img id="modalImg" src="" class="w-full h-auto rounded-xl shadow-2xl border-2 border-yellow-400/50" />
+      <p id="modalCaption" class="mt-3 text-sm font-semibold text-yellow-400 bg-slate-900/80 px-4 py-1.5 rounded-full border border-slate-700"></p>
     </div>
   </div>
 
@@ -66,6 +96,9 @@
     const haveList = document.getElementById('haveList');
     const wantList = document.getElementById('wantList');
     const rarityBadge = document.getElementById('rarityBadge');
+    const imageModal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImg');
+    const modalCaption = document.getElementById('modalCaption');
 
     let haveCards = [];
     let wantCards = [];
@@ -86,52 +119,49 @@
         const isMismatched = lockedRarity && card.rarity !== lockedRarity;
 
         return `
-          <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col justify-between ${isMismatched ? 'opacity-30' : ''}">
-            <div class="flex gap-4">
-              <!-- 左侧：卡牌视觉图片 -->
-              <div class="w-24 h-36 flex-shrink-0 rounded-lg overflow-hidden bg-slate-900 border border-slate-700 shadow-md">
-                <img 
-                  src="${card.image}" 
-                  alt="${card.name}" 
-                  class="w-full h-full object-cover"
-                  onerror="this.onerror=null; this.src='https://via.placeholder.com/150x210/1e293b/94a3b8?text=No+Image';"
-                />
-              </div>
-
-              <!-- 右侧：详情与识别标识 -->
-              <div class="flex-1 flex flex-col justify-between">
-                <div>
-                  <div class="flex justify-between items-start mb-1">
-                    <h3 class="font-bold text-white text-base">${card.name}</h3>
-                  </div>
-                  <div class="flex flex-wrap gap-1 mb-2">
-                    <span class="text-xs px-2 py-0.5 rounded font-semibold bg-slate-700 text-yellow-400">
-                      ${card.rarity || '标准'}
-                    </span>
-                    <span class="text-xs px-2 py-0.5 rounded font-mono bg-slate-900 text-slate-300">
-                      ${card.id}
-                    </span>
-                  </div>
-                  <p class="text-xs text-slate-400">${card.pack || '基础包'}</p>
-                </div>
+          <div class="bg-slate-800 rounded-2xl p-3 border border-slate-700/80 flex flex-col justify-between card-hover-effect relative group ${isMismatched ? 'opacity-30' : ''}">
+            
+            <!-- 卡牌核心展示区 (大图) -->
+            <div class="relative w-full card-aspect rounded-xl overflow-hidden bg-slate-950 border border-slate-700/50 cursor-zoom-in" onclick="openModal('${card.image}', '${card.name} [#${card.id}]')">
+              <img 
+                src="${card.image}" 
+                alt="${card.name}" 
+                class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                onerror="this.onerror=null; this.src='https://via.placeholder.com/300x420/1e293b/94a3b8?text=No+Image';"
+              />
+              
+              <!-- 顶部浮动 Tag：编号与稀有度 -->
+              <div class="absolute top-2 left-2 right-2 flex justify-between items-center pointer-events-none">
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-950/80 text-slate-200 border border-slate-700/60 backdrop-blur-md">
+                  ${card.id}
+                </span>
+                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-yellow-500/90 text-slate-950 backdrop-blur-md">
+                  ${card.rarity || '标准'}
+                </span>
               </div>
             </div>
 
+            <!-- 卡牌名称 -->
+            <div class="mt-2 mb-3 text-center">
+              <h3 class="font-bold text-white text-sm truncate" title="${card.name}">${card.name}</h3>
+              <p class="text-[11px] text-slate-400 truncate">${card.pack || '基础包'}</p>
+            </div>
+
             <!-- 操作按钮 -->
-            <div class="flex gap-2 pt-3 mt-3 border-t border-slate-700/50">
+            <div class="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-700/50">
               <button 
                 onclick='addWantCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
                 ${isMismatched ? 'disabled' : ''}
-                class="flex-1 py-1.5 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-slate-900 rounded font-bold text-xs transition disabled:cursor-not-allowed"
+                class="py-1.5 bg-yellow-500/20 hover:bg-yellow-500 text-yellow-400 hover:text-slate-950 border border-yellow-500/30 rounded-lg font-bold text-xs transition disabled:cursor-not-allowed disabled:opacity-50"
               >
-                + 想要 (Want)
+                + 想要
               </button>
               <button 
                 onclick='addHaveCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
                 ${!lockedRarity || isMismatched ? 'disabled' : ''}
-                class="flex-1 py-1.5 bg-green-500/20 text-green-400 hover:bg-green-500 hover:text-slate-900 rounded font-bold text-xs transition disabled:opacity-30 disabled:cursor-not-allowed"
+                class="py-1.5 bg-green-500/20 hover:bg-green-500 text-green-400 hover:text-slate-950 border border-green-500/30 rounded-lg font-bold text-xs transition disabled:cursor-not-allowed disabled:opacity-30"
               >
-                + 我有 (Have)
+                + 我有
               </button>
             </div>
           </div>
@@ -139,11 +169,21 @@
       }).join('');
     }
 
+    function openModal(imgUrl, caption) {
+      modalImg.src = imgUrl;
+      modalCaption.innerText = caption;
+      imageModal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      imageModal.classList.add('hidden');
+    }
+
     function addWantCard(card) {
       if (!lockedRarity) {
         lockedRarity = card.rarity;
       } else if (card.rarity !== lockedRarity) {
-        alert(`Pocket 规则：只能交换同等稀有度的卡牌！当前已锁定为 [${lockedRarity}]`);
+        alert(`Pocket 交易规则：必须同稀有度！当前已锁定 [${lockedRarity}]`);
         return;
       }
 
@@ -156,7 +196,7 @@
 
     function addHaveCard(card) {
       if (card.rarity !== lockedRarity) {
-        alert(`必须选择同为 [${lockedRarity}] 稀有度的卡牌！`);
+        alert(`请选择同为 [${lockedRarity}] 稀有度的卡牌！`);
         return;
       }
 
@@ -183,35 +223,35 @@
 
     function updateTradeUI() {
       rarityBadge.innerHTML = lockedRarity 
-        ? `<span class="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">已锁定: ${lockedRarity}</span>`
+        ? `<span class="text-[11px] font-semibold bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full border border-yellow-500/30">已锁定: ${lockedRarity}</span>`
         : '';
 
-      // 愿望单增加微型小缩略图 + ID 编号
+      // 愿望单右侧：放大图片比例并提高画质
       wantList.innerHTML = wantCards.length ? wantCards.map(c => `
-        <div class="flex justify-between items-center bg-slate-800 p-2 rounded border border-slate-700">
-          <div class="flex items-center gap-2">
-            <img src="${c.image}" class="w-8 h-11 object-cover rounded bg-slate-900" onerror="this.src='https://via.placeholder.com/32x44';" />
+        <div class="flex justify-between items-center bg-slate-800 p-2 rounded-xl border border-slate-700/70 shadow-sm">
+          <div class="flex items-center gap-3">
+            <img src="${c.image}" class="w-12 h-16 object-cover rounded-lg bg-slate-950 border border-slate-700 cursor-pointer" onclick="openModal('${c.image}', '${c.name} [#${c.id}]')" />
             <div>
-              <p class="text-xs font-bold text-slate-200">${c.name}</p>
-              <p class="text-[10px] font-mono text-yellow-400">${c.id} | ${c.rarity}</p>
+              <p class="text-xs font-bold text-white">${c.name}</p>
+              <p class="text-[11px] font-mono text-yellow-400 mt-0.5">#${c.id}</p>
             </div>
           </div>
-          <button onclick="removeItem('want', '${c.id}')" class="text-red-400 text-xs px-2">✕</button>
+          <button onclick="removeItem('want', '${c.id}')" class="text-slate-400 hover:text-red-400 text-sm px-2 transition">✕</button>
         </div>
-      `).join('') : '<p class="text-slate-500 text-xs text-center py-6">点击下方卡牌 "+ 想要 (Want)"</p>';
+      `).join('') : '<p class="text-slate-500 text-xs text-center py-6">第一步：点击左侧卡牌 "+ 想要"</p>';
 
       haveList.innerHTML = haveCards.length ? haveCards.map(c => `
-        <div class="flex justify-between items-center bg-slate-800 p-2 rounded border border-slate-700">
-          <div class="flex items-center gap-2">
-            <img src="${c.image}" class="w-8 h-11 object-cover rounded bg-slate-900" onerror="this.src='https://via.placeholder.com/32x44';" />
+        <div class="flex justify-between items-center bg-slate-800 p-2 rounded-xl border border-slate-700/70 shadow-sm">
+          <div class="flex items-center gap-3">
+            <img src="${c.image}" class="w-12 h-16 object-cover rounded-lg bg-slate-950 border border-slate-700 cursor-pointer" onclick="openModal('${c.image}', '${c.name} [#${c.id}]')" />
             <div>
-              <p class="text-xs font-bold text-slate-200">${c.name}</p>
-              <p class="text-[10px] font-mono text-green-400">${c.id} | ${c.rarity}</p>
+              <p class="text-xs font-bold text-white">${c.name}</p>
+              <p class="text-[11px] font-mono text-green-400 mt-0.5">#${c.id}</p>
             </div>
           </div>
-          <button onclick="removeItem('have', '${c.id}')" class="text-red-400 text-xs px-2">✕</button>
+          <button onclick="removeItem('have', '${c.id}')" class="text-slate-400 hover:text-red-400 text-sm px-2 transition">✕</button>
         </div>
-      `).join('') : '<p class="text-slate-500 text-xs text-center py-6">锁定稀有度后选择重复卡</p>';
+      `).join('') : '<p class="text-slate-500 text-xs text-center py-6">第二步：选择同稀有度的重复卡</p>';
     }
 
     function exportTradePost() {
@@ -223,7 +263,7 @@
       text += `DM me if interested!`;
 
       navigator.clipboard.writeText(text);
-      alert('已复制贴文格式！已自动附带卡牌编号 [#ID]，确保交易不会混淆：\n\n' + text);
+      alert('已复制交换帖！带精确编号，防止同名不同画风发错卡。');
     }
 
     searchInput.addEventListener('input', fetchCards);
