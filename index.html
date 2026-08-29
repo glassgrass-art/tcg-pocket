@@ -3,135 +3,250 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pokémon TCG Pocket 全图鉴交换匹配器</title>
+  <title>Pokémon TCG Pocket 交换匹配器</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .card-aspect { aspect-ratio: 2.5 / 3.5; }
-    .card-hover { transition: all 0.2s ease; }
-    .card-hover:hover { transform: translateY(-4px); }
+    .card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .card-hover:hover { transform: translateY(-3px); }
   </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen p-6">
+<body class="bg-slate-900 text-white min-h-screen p-4 sm:p-6">
   <div class="max-w-7xl mx-auto">
-    <header class="mb-6 text-center">
-      <h1 class="text-3xl font-bold text-yellow-400">Pokémon TCG Pocket Trade Matcher</h1>
-      <p class="text-slate-400 mt-1 text-sm">已支持多扩展包全图鉴 | 懒加载极速渲染 | 同稀有度匹配</p>
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl font-extrabold text-yellow-400 tracking-tight">Pokémon TCG Pocket Trade Matcher</h1>
+      <p class="text-slate-400 mt-1 text-sm">按稀有度筛选 ➔ 展开扩展包 ➔ 快速匹配等价卡牌</p>
     </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <!-- 左侧：卡牌检索 -->
-      <div class="lg:col-span-2">
-        <div class="mb-6">
-          <input 
-            type="text" 
-            id="searchInput" 
-            placeholder="搜索卡牌名称或卡号 (例如: Pikachu 或 A1-096)..." 
-            class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:outline-none focus:border-yellow-400 text-sm shadow-inner"
-          />
+      
+      <!-- 左侧主区域：两步法卡牌选择器 -->
+      <div class="lg:col-span-2 space-y-6">
+        
+        <!-- STEP 1: 选择稀有度 -->
+        <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 shadow-lg">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-yellow-500 text-slate-950 flex items-center justify-center text-xs font-black">1</span>
+              第一步：选择交易稀有度 (Rarity)
+            </h2>
+            <button id="resetRarityBtn" onclick="resetRaritySelection()" class="hidden text-xs text-red-400 hover:text-red-300 underline">
+              重置重选
+            </button>
+          </div>
+
+          <!-- 稀有度按钮组 (根据 TCG Pocket 常见稀有度设置) -->
+          <div id="raritySelector" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <button onclick="selectRarity('One Diamond')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
+              ♢ 1 菱形
+            </button>
+            <button onclick="selectRarity('Two Diamond')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
+              ♢♢ 2 菱形
+            </button>
+            <button onclick="selectRarity('Three Diamond')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
+              ♢♢♢ 3 菱形
+            </button>
+            <button onclick="selectRarity('Four Diamond')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
+              ♢♢♢♢ 4 菱形
+            </button>
+            <button onclick="selectRarity('One Star')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
+              ⭐ 1 星级
+            </button>
+            <button onclick="selectRarity('Two Star')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
+              ⭐⭐ 2 星级
+            </button>
+            <button onclick="selectRarity('Three Star')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
+              ⭐⭐⭐ 3 星级
+            </button>
+            <button onclick="selectRarity('Crown')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-amber-400">
+              👑 皇冠 Crown
+            </button>
+          </div>
         </div>
 
-        <div id="cardsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
-        <div id="loading" class="text-center py-8 text-slate-500 text-sm">加载中...</div>
+        <!-- STEP 2: 扩展包分支树 -->
+        <div id="step2Container" class="bg-slate-800 rounded-2xl p-5 border border-slate-700 shadow-lg hidden">
+          <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-yellow-500 text-slate-950 flex items-center justify-center text-xs font-black">2</span>
+            第二步：选择扩展包展开卡牌 (<span id="selectedRarityLabel" class="text-yellow-400"></span>)
+          </h2>
+
+          <div id="setTree" class="space-y-3"></div>
+        </div>
+
+        <!-- 初始空状态提示 -->
+        <div id="emptyPrompt" class="text-center py-16 bg-slate-800/40 rounded-2xl border border-dashed border-slate-700">
+          <p class="text-slate-400 text-sm">👈 请先在上方选择一个稀有度，开始匹配交换</p>
+        </div>
+
       </div>
 
-      <!-- 右侧：交换愿望单 -->
-      <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 h-fit sticky top-6 space-y-6">
+      <!-- 右侧：愿望单/拥有清单 Sticky Panel -->
+      <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 h-fit sticky top-6 space-y-6 shadow-xl">
         <div>
           <div class="flex justify-between items-center mb-2">
             <h2 class="text-base font-bold text-yellow-400">🟡 我想要的 (Want)</h2>
             <span id="rarityBadge"></span>
           </div>
-          <div id="wantList" class="space-y-2 min-h-[80px] bg-slate-900/60 p-2 rounded-xl border border-slate-700/60"></div>
+          <div id="wantList" class="space-y-2 min-h-[80px] bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/60"></div>
         </div>
 
         <div>
           <h2 class="text-base font-bold text-green-400 mb-2">🟢 我有的 (Have)</h2>
-          <div id="haveList" class="space-y-2 min-h-[80px] bg-slate-900/60 p-2 rounded-xl border border-slate-700/60"></div>
+          <div id="haveList" class="space-y-2 min-h-[80px] bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/60"></div>
         </div>
 
         <button onclick="exportTradePost()" class="w-full py-3 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold rounded-xl shadow-lg transition">
-          复制交换帖 (Format for Reddit/Discord)
+          复制交换贴 (Post Template)
         </button>
       </div>
+
     </div>
   </div>
 
   <!-- 大图 Preview Modal -->
   <div id="imageModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" onclick="closeModal()">
-    <div class="relative max-w-sm w-full flex flex-col items-center">
+    <div class="relative max-w-xs sm:max-w-sm w-full flex flex-col items-center">
       <img id="modalImg" src="" class="w-full h-auto rounded-xl shadow-2xl border-2 border-yellow-400/50" />
       <p id="modalCaption" class="mt-3 text-sm font-semibold text-yellow-400 bg-slate-900 px-4 py-1.5 rounded-full border border-slate-700"></p>
     </div>
   </div>
 
   <script>
-    const searchInput = document.getElementById('searchInput');
-    const cardsGrid = document.getElementById('cardsGrid');
-    const loading = document.getElementById('loading');
-    const wantList = document.getElementById('wantList');
-    const haveList = document.getElementById('haveList');
-    const rarityBadge = document.getElementById('rarityBadge');
+    let selectedRarity = null;
+    let setsDataCache = [];
+    let wantCards = [];
+    let haveCards = [];
 
-    let haveCards = [], wantCards = [], lockedRarity = null;
-    let timer = null;
+    async function selectRarity(rarity) {
+      if ((wantCards.length || haveCards.length) && selectedRarity !== rarity) {
+        if (!confirm(`更换稀有度将清空当前已选的交换清单，确定切换吗？`)) return;
+        wantCards = [];
+        haveCards = [];
+        updateTradeUI();
+      }
 
-    async function fetchCards() {
-      loading.style.display = 'block';
-      const search = searchInput.value.trim();
-      const res = await fetch(`/api/cards?search=${encodeURIComponent(search)}&limit=60`);
+      selectedRarity = rarity;
+      
+      // 高亮选中的稀有度按钮
+      document.querySelectorAll('.rarity-btn').forEach(btn => {
+        if (btn.innerText.includes(rarity) || btn.getAttribute('onclick').includes(rarity)) {
+          btn.classList.add('border-yellow-400', 'bg-yellow-500/10', 'text-yellow-400');
+        } else {
+          btn.classList.remove('border-yellow-400', 'bg-yellow-500/10', 'text-yellow-400');
+        }
+      });
+
+      document.getElementById('resetRarityBtn').classList.remove('hidden');
+      document.getElementById('emptyPrompt').classList.add('hidden');
+      document.getElementById('step2Container').classList.remove('hidden');
+      document.getElementById('selectedRarityLabel').innerText = rarity;
+
+      // 拉取数据
+      document.getElementById('setTree').innerHTML = `<p class="text-center py-8 text-slate-400 text-sm">正在加载卡牌分类数据...</p>`;
+      
+      const res = await fetch(`/api/cards?rarity=${encodeURIComponent(rarity)}`);
       const result = await res.json();
-      loading.style.display = 'none';
-      renderCards(result.data || []);
+      setsDataCache = result.data || [];
+
+      renderSetTree();
     }
 
-    function renderCards(cards) {
-      if (!cards.length) {
-        cardsGrid.innerHTML = `<p class="col-span-full text-center text-slate-500 py-10">未找到相关卡牌</p>`;
+    function resetRaritySelection() {
+      if (wantCards.length || haveCards.length) {
+        if (!confirm('确定要重置并清空已选列表吗？')) return;
+      }
+      selectedRarity = null;
+      wantCards = [];
+      haveCards = [];
+      updateTradeUI();
+
+      document.querySelectorAll('.rarity-btn').forEach(btn => btn.classList.remove('border-yellow-400', 'bg-yellow-500/10', 'text-yellow-400'));
+      document.getElementById('resetRarityBtn').classList.add('hidden');
+      document.getElementById('step2Container').classList.add('hidden');
+      document.getElementById('emptyPrompt').classList.remove('hidden');
+    }
+
+    function renderSetTree() {
+      const treeContainer = document.getElementById('setTree');
+
+      if (!setsDataCache.length) {
+        treeContainer.innerHTML = `<p class="text-center text-slate-400 py-6 text-sm">该稀有度下暂无可用卡牌</p>`;
         return;
       }
 
-      cardsGrid.innerHTML = cards.map(card => {
-        const isMismatched = lockedRarity && card.rarity !== lockedRarity;
-
-        return `
-          <div class="bg-slate-800 rounded-xl p-2.5 border border-slate-700/80 flex flex-col justify-between card-hover relative ${isMismatched ? 'opacity-30' : ''}">
-            <div class="relative w-full card-aspect rounded-lg overflow-hidden bg-slate-950 cursor-pointer" onclick="openModal('${card.highImage}', '${card.name} [#${card.id}]')">
-              <img 
-                src="${card.image}" 
-                loading="lazy" 
-                alt="${card.name}" 
-                class="w-full h-full object-cover"
-                onerror="this.src='https://via.placeholder.com/200x280?text=No+Image';"
-              />
-              <span class="absolute top-1 left-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-950/80 text-slate-200 border border-slate-700/60">
-                ${card.id}
-              </span>
+      treeContainer.innerHTML = setsDataCache.map(set => `
+        <div class="border border-slate-700/80 rounded-xl overflow-hidden bg-slate-900/50">
+          <!-- 扩展包 Header (点击展开/折叠) -->
+          <button 
+            onclick="toggleSetFolder('${set.setId}')"
+            class="w-full px-4 py-3 bg-slate-800/80 hover:bg-slate-700/80 flex justify-between items-center text-left transition"
+          >
+            <div class="flex items-center gap-2">
+              <span id="icon-${set.setId}" class="text-yellow-400 text-xs font-bold">▶</span>
+              <span class="font-bold text-sm text-white">${set.setName} (${set.setId})</span>
             </div>
+            <span class="text-xs bg-slate-700 text-slate-300 px-2.5 py-0.5 rounded-full font-mono">
+              ${set.totalCards} 张
+            </span>
+          </button>
 
-            <div class="mt-2 mb-2 text-center">
-              <h3 class="font-bold text-white text-xs truncate" title="${card.name}">${card.name}</h3>
-              <p class="text-[10px] text-yellow-400 font-medium truncate">${card.rarity}</p>
-            </div>
+          <!-- 扩展包卡牌列表网格 (默认隐藏) -->
+          <div id="folder-${set.setId}" class="hidden p-4 bg-slate-950/40 border-t border-slate-800">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              ${set.cards.map(card => `
+                <div class="bg-slate-800/90 rounded-xl p-2 border border-slate-700 flex flex-col justify-between card-hover">
+                  <div class="relative w-full card-aspect rounded-lg overflow-hidden bg-slate-950 cursor-pointer" onclick="openModal('${card.highImage}', '${card.name} [#${card.id}]')">
+                    <img 
+                      src="${card.image}" 
+                      loading="lazy" 
+                      alt="${card.name}" 
+                      class="w-full h-full object-cover"
+                      onerror="this.src='https://via.placeholder.com/200x280?text=No+Image';"
+                    />
+                    <span class="absolute top-1 left-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-950/80 text-slate-200 border border-slate-700/60">
+                      ${card.id}
+                    </span>
+                  </div>
 
-            <div class="grid grid-cols-2 gap-1 border-t border-slate-700/50 pt-1.5">
-              <button 
-                onclick='addWantCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
-                ${isMismatched ? 'disabled' : ''}
-                class="py-1 bg-yellow-500/20 hover:bg-yellow-500 text-yellow-400 hover:text-slate-950 rounded font-bold text-[11px] transition disabled:opacity-40"
-              >
-                + 想要
-              </button>
-              <button 
-                onclick='addHaveCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
-                ${!lockedRarity || isMismatched ? 'disabled' : ''}
-                class="py-1 bg-green-500/20 hover:bg-green-500 text-green-400 hover:text-slate-950 rounded font-bold text-[11px] transition disabled:opacity-30"
-              >
-                + 我有
-              </button>
+                  <div class="my-1.5 text-center">
+                    <h3 class="font-bold text-white text-xs truncate" title="${card.name}">${card.name}</h3>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-1 border-t border-slate-700/50 pt-1.5">
+                    <button 
+                      onclick='addWantCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
+                      class="py-1 bg-yellow-500/20 hover:bg-yellow-500 text-yellow-400 hover:text-slate-950 rounded font-bold text-[11px] transition"
+                    >
+                      + 想要
+                    </button>
+                    <button 
+                      onclick='addHaveCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
+                      class="py-1 bg-green-500/20 hover:bg-green-500 text-green-400 hover:text-slate-950 rounded font-bold text-[11px] transition"
+                    >
+                      + 我有
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
             </div>
           </div>
-        `;
-      }).join('');
+        </div>
+      `).join('');
+    }
+
+    function toggleSetFolder(setId) {
+      const folder = document.getElementById(`folder-${setId}`);
+      const icon = document.getElementById(`icon-${setId}`);
+      const isHidden = folder.classList.contains('hidden');
+
+      if (isHidden) {
+        folder.classList.remove('hidden');
+        icon.innerText = '▼';
+      } else {
+        folder.classList.add('hidden');
+        icon.innerText = '▶';
+      }
     }
 
     function openModal(img, caption) {
@@ -142,18 +257,13 @@
     function closeModal() { document.getElementById('imageModal').classList.add('hidden'); }
 
     function addWantCard(card) {
-      if (!lockedRarity) lockedRarity = card.rarity;
-      else if (card.rarity !== lockedRarity) return alert(`Pocket 规则：必须交换相同稀有度的卡！锁定为 [${lockedRarity}]`);
-
       if (!wantCards.some(c => c.id === card.id)) {
         wantCards.push(card);
         updateTradeUI();
-        fetchCards();
       }
     }
 
     function addHaveCard(card) {
-      if (card.rarity !== lockedRarity) return alert(`请选择 [${lockedRarity}] 稀有度的卡牌！`);
       if (!haveCards.some(c => c.id === card.id)) {
         haveCards.push(card);
         updateTradeUI();
@@ -163,16 +273,13 @@
     function removeItem(type, id) {
       if (type === 'want') wantCards = wantCards.filter(c => c.id !== id);
       else haveCards = haveCards.filter(c => c.id !== id);
-
-      if (!wantCards.length && !haveCards.length) lockedRarity = null;
       updateTradeUI();
-      fetchCards();
     }
 
     function updateTradeUI() {
-      rarityBadge.innerHTML = lockedRarity ? `<span class="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">已锁定: ${lockedRarity}</span>` : '';
+      document.getElementById('rarityBadge').innerHTML = selectedRarity ? `<span class="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">已锁定: ${selectedRarity}</span>` : '';
 
-      wantList.innerHTML = wantCards.length ? wantCards.map(c => `
+      document.getElementById('wantList').innerHTML = wantCards.length ? wantCards.map(c => `
         <div class="flex justify-between items-center bg-slate-800 p-1.5 rounded-lg border border-slate-700">
           <div class="flex items-center gap-2">
             <img src="${c.image}" class="w-8 h-11 object-cover rounded bg-slate-950" />
@@ -185,7 +292,7 @@
         </div>
       `).join('') : '<p class="text-slate-500 text-xs text-center py-4">点击 "+ 想要"</p>';
 
-      haveList.innerHTML = haveCards.length ? haveCards.map(c => `
+      document.getElementById('haveList').innerHTML = haveCards.length ? haveCards.map(c => `
         <div class="flex justify-between items-center bg-slate-800 p-1.5 rounded-lg border border-slate-700">
           <div class="flex items-center gap-2">
             <img src="${c.image}" class="w-8 h-11 object-cover rounded bg-slate-950" />
@@ -201,21 +308,13 @@
 
     function exportTradePost() {
       if (!haveCards.length && !wantCards.length) return alert('请先添加卡牌！');
-      let text = `[Pokémon TCG Pocket Trade]\n\n🟡 WANT:\n` + 
-        (wantCards.map(c => `- ${c.name} [#${c.id}] (${c.rarity})`).join('\n') || '- None') + 
+      let text = `[Pokémon TCG Pocket Trade] (${selectedRarity})\n\n🟡 WANT:\n` + 
+        (wantCards.map(c => `- ${c.name} [#${c.id}]`).join('\n') || '- None') + 
         `\n\n🟢 HAVE:\n` + 
-        (haveCards.map(c => `- ${c.name} [#${c.id}] (${c.rarity})`).join('\n') || '- None');
+        (haveCards.map(c => `- ${c.name} [#${c.id}]`).join('\n') || '- None');
       navigator.clipboard.writeText(text);
-      alert('贴文已复制！带准确编号');
+      alert('贴文已复制！');
     }
-
-    // 输入搜索防抖 300ms
-    searchInput.addEventListener('input', () => {
-      clearTimeout(timer);
-      timer = setTimeout(fetchCards, 300);
-    });
-
-    fetchCards();
   </script>
 </body>
 </html>
