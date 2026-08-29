@@ -19,7 +19,7 @@
     "retreat_cost": 1,
     "pack": "Genetic Apex - Pikachu",
     "rarity": "4-Diamond",
-    "image": "https://assets.tcgpocket.example/cards/A1-001.png"
+    "image": "https://images.pokemontcg.io/sv3pt5/25_hires.png"
   },
   {
     "id": "A1-045",
@@ -42,7 +42,7 @@
     "retreat_cost": 1,
     "pack": "Genetic Apex",
     "rarity": "4-Diamond",
-    "image": "https://assets.tcgpocket.example/cards/A1-045.png"
+    "image": "https://images.pokemontcg.io/swsh11/92_hires.png"
   },
   {
     "id": "A1-180",
@@ -52,6 +52,6 @@
     "text": "Draw 2 cards.",
     "pack": "Genetic Apex",
     "rarity": "2-Diamond",
-    "image": "https://assets.tcgpocket.example/cards/A1-180.png"
+    "image": "https://images.pokemontcg.io/cel25/24_hires.png"
   }
 ]
