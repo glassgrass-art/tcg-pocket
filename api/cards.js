@@ -1,41 +1,55 @@
 export default async function handler(req, res) {
-  const { search = '' } = req.query;
+  const { search = '', page = 1, limit = 30 } = req.query;
 
   try {
-    // 1. 从开源 TCG Pocket 数据源拉取全量 A1 (最强的基因) 卡牌列表
-    // 支持全量卡图、编号、稀有度
-    const response = await fetch('https://api.tcgdex.net/v2/en/series/tcgp');
-    const seriesData = await response.json();
+    // 涵盖 Pocket 目前发行的核心及补充扩展包列表
+    const setIds = ['A1', 'A1a', 'P-A']; 
+    
+    // 并发获取所有 Set 的卡牌数据
+    const setPromises = setIds.map(setId => 
+      fetch(`https://api.tcgdex.net/v2/en/sets/${setId}`)
+        .then(r => r.ok ? r.json() : { cards: [] })
+        .catch(() => ({ cards: [] }))
+    );
 
-    // 2. 拿到所有 Pocket 扩展包 (如 A1, A1a 等)
+    const setsData = await Promise.all(setPromises);
+
+    // 扁平化整合全量卡牌
     let allCards = [];
-    
-    // 如果获取成功，遍历数据（这里默认拉取核心扩展包卡池）
-    const setRes = await fetch('https://api.tcgdex.net/v2/en/sets/A1');
-    const setData = await setRes.json();
-    
-    if (setData && setData.cards) {
-      allCards = setData.cards.map(card => ({
-        id: card.id.replace('A1-', 'A1-'),
-        name: card.name,
-        pack: 'Genetic Apex (最强的基因)',
-        rarity: card.rarity || 'Standard',
-        image: card.image ? `${card.image}/high.webp` : 'https://via.placeholder.com/300x420'
-      }));
-    }
+    setsData.forEach(setData => {
+      if (setData && setData.cards) {
+        const setCards = setData.cards.map(card => ({
+          id: card.id,
+          name: card.name,
+          pack: setData.name || 'TCG Pocket',
+          rarity: card.rarity || 'Standard',
+          // 使用 low.webp 做低延迟预览，点开大图再载入 high.webp
+          image: card.image ? `${card.image}/low.webp` : '',
+          highImage: card.image ? `${card.image}/high.webp` : ''
+        }));
+        allCards = allCards.concat(setCards);
+      }
+    });
 
-    // 3. 过滤搜索关键字
+    // 关键字检索（支持按卡名或编号）
     if (search) {
-      const keyword = search.toLowerCase();
+      const kw = search.toLowerCase();
       allCards = allCards.filter(c => 
-        c.name.toLowerCase().includes(keyword) || 
-        c.id.toLowerCase().includes(keyword)
+        c.name.toLowerCase().includes(kw) || 
+        c.id.toLowerCase().includes(kw)
       );
     }
 
-    res.status(200).json({ data: allCards });
+    // 分页截取，防止前端卡顿
+    const startIndex = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedCards = allCards.slice(startIndex, startIndex + parseInt(limit));
+
+    res.status(200).json({ 
+      data: paginatedCards, 
+      total: allCards.length 
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to fetch full card database' });
+    res.status(500).json({ error: 'Failed to fetch cards' });
   }
 }
