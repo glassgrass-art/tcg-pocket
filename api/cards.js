@@ -29,28 +29,28 @@ export default async function handler(req, res) {
 
     const targetSets = setId ? knownSets.filter(s => s.id.toLowerCase() === setId.toLowerCase()) : knownSets;
 
-    // 严密的稀有度归一化函数
+    // 官方精准稀有度映射 (含彩星 / 异色星)
     function normalizeRarity(rawRarity) {
-      if (!rawRarity) return '';
+      if (!rawRarity) return '1diamond';
       const r = rawRarity.toString().trim();
       const s = r.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // 1 菱形
-      if (r === '◇' || r === '◆' || s.includes('1diamond') || s.includes('onediamond') || s === 'common' || s === 'c') return '1diamond';
-      // 2 菱形
-      if (r === '◇◇' || r === '◆◆' || s.includes('2diamond') || s.includes('twodiamond') || s === 'uncommon' || s === 'uc') return '2diamond';
-      // 3 菱形
-      if (r === '◇◇◇' || r === '◆◆◆' || s.includes('3diamond') || s.includes('threediamond') || s === 'rare' || s === 'r') return '3diamond';
-      // 4 菱形
-      if (r === '◇◇◇◇' || r === '◆◆◆◆' || s.includes('4diamond') || s.includes('fourdiamond') || s.includes('doublerare') || s === 'rr') return '4diamond';
+      // 符号与英文标准匹配
+      if (r === '◇' || r === '◆' || s.includes('1diamond') || s === 'onediamond' || s === 'common') return '1diamond';
+      if (r === '◇◇' || r === '◆◆' || s.includes('2diamond') || s === 'twodiamond' || s === 'uncommon') return '2diamond';
+      if (r === '◇◇◇' || r === '◆◆◆' || s.includes('3diamond') || s === 'threediamond' || s === 'rare') return '3diamond';
+      if (r === '◇◇◇◇' || r === '◆◆◆◆' || s.includes('4diamond') || s === 'fourdiamond' || s === 'doublerare' || s === 'rr') return '4diamond';
 
-      // 星级与皇冠
+      // 异色 / 彩星卡识别 (Shiny Star)
+      if (s.includes('shiny') || s.includes('colorstar') || s.includes('shinystar') || r.includes('S')) return 'shinystar';
+
+      // 普通星级与皇冠
       if (r === '☆' || r === '★' || s.includes('1star') || s.includes('onestar') || s === 'ar') return '1star';
       if (r === '☆☆' || r === '★★' || s.includes('2star') || s.includes('twostar') || s === 'sar' || s === 'sr') return '2star';
       if (r === '☆☆☆' || r === '★★★' || s.includes('3star') || s.includes('threestar') || s === 'ur' || s.includes('immersive')) return '3star';
       if (r === '♛' || r === '👑' || s.includes('crown')) return 'crown';
 
-      return '';
+      return '1diamond';
     }
 
     const targetNormRarity = rarity ? normalizeRarity(rarity) : '';
@@ -66,16 +66,23 @@ export default async function handler(req, res) {
         const setData = await res.json();
         if (!setData || !setData.cards) return null;
 
-        // 格式化数据并补充规范化稀有度
-        const formattedCards = setData.cards.map(card => {
-          const rawRarity = card.rarity || '';
-          let normRarity = normalizeRarity(rawRarity);
+        // 并发批量调取该 Set 内部单卡详情获取绝对精准的官方 rarity
+        const detailPromises = setData.cards.map(async (c) => {
+          try {
+            const cardRes = await fetch(`https://api.tcgdex.net/v2/en/cards/${c.id}`, { signal: AbortSignal.timeout(3000) });
+            if (cardRes.ok) {
+              const detail = await cardRes.json();
+              return { ...c, rarity: detail.rarity || c.rarity };
+            }
+          } catch (e) {}
+          return c;
+        });
 
-          // 针对 1~4 菱形缺失的特殊补充逻辑：
-          // 很多 4 菱形都是 ex 卡
-          if (!normRarity && (card.name.toLowerCase().includes(' ex') || card.name.toLowerCase().endsWith('ex'))) {
-            normRarity = '4diamond';
-          }
+        const fullCardsData = await Promise.all(detailPromises);
+
+        const formattedCards = fullCardsData.map(card => {
+          const rawRarity = card.rarity || '';
+          const normRarity = normalizeRarity(rawRarity);
 
           return {
             id: card.id,
@@ -83,15 +90,14 @@ export default async function handler(req, res) {
             name: card.name,
             setId: setItem.id,
             setName: setItem.name,
-            rarity: rawRarity || normRarity,
+            rarity: rawRarity || '◇',
             normRarity: normRarity,
             image: card.image ? `${card.image}/low.webp` : '',
             highImage: card.image ? `${card.image}/high.webp` : ''
           };
         });
 
-        // 严格过滤：未匹配到稀有度的卡牌会被丢弃，避免混入 1 菱形
-        let filteredCards = targetNormRarity
+        const filteredCards = targetNormRarity
           ? formattedCards.filter(c => c.normRarity === targetNormRarity)
           : formattedCards;
 
@@ -113,7 +119,7 @@ export default async function handler(req, res) {
     const result = resultsArray.filter(Boolean);
 
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate'); // 开启强缓存，二次加载瞬间完成
     res.status(200).json({ data: result });
 
   } catch (error) {
