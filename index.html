@@ -11,7 +11,7 @@
     <!-- 头部 -->
     <header class="mb-6 text-center">
       <h1 class="text-3xl font-bold tracking-wide text-yellow-400">Pokémon TCG Pocket Trade Matcher</h1>
-      <p class="text-slate-400 mt-1">先选想要卡锁定稀有度，再匹配同等稀有度的重复卡</p>
+      <p class="text-slate-400 mt-1">精准按卡图与卡号匹配同名卡交换</p>
     </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -36,7 +36,7 @@
             <h2 class="text-lg font-bold text-yellow-400">🟡 第一步：我想要的 (Want)</h2>
             <span id="rarityBadge" class="text-xs text-slate-400"></span>
           </div>
-          <div id="wantList" class="space-y-1.5 min-h-[80px] bg-slate-900/50 p-2 rounded border border-slate-700/50">
+          <div id="wantList" class="space-y-2 min-h-[80px] bg-slate-900/50 p-2 rounded border border-slate-700/50">
             <p class="text-slate-500 text-xs text-center py-6">点击下方卡牌 "+ 想要 (Want)"</p>
           </div>
         </div>
@@ -44,7 +44,7 @@
         <!-- 我拥有的 (Have) -->
         <div>
           <h2 class="text-lg font-bold text-green-400 mb-2">🟢 第二步：我有的 (Have)</h2>
-          <div id="haveList" class="space-y-1.5 min-h-[80px] bg-slate-900/50 p-2 rounded border border-slate-700/50">
+          <div id="haveList" class="space-y-2 min-h-[80px] bg-slate-900/50 p-2 rounded border border-slate-700/50">
             <p class="text-slate-500 text-xs text-center py-6">锁定稀有度后选择重复卡</p>
           </div>
         </div>
@@ -54,7 +54,7 @@
           onclick="exportTradePost()" 
           class="w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold rounded-lg transition"
         >
-          复制交换帖 (Format for Reddit/Discord)
+          复制交换帖 (带唯一编号)
         </button>
       </div>
     </div>
@@ -88,7 +88,7 @@
         return `
           <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col justify-between ${isMismatched ? 'opacity-30' : ''}">
             <div class="flex gap-4">
-              <!-- 左侧：卡牌图片展示区 -->
+              <!-- 左侧：卡牌视觉图片 -->
               <div class="w-24 h-36 flex-shrink-0 rounded-lg overflow-hidden bg-slate-900 border border-slate-700 shadow-md">
                 <img 
                   src="${card.image}" 
@@ -98,21 +98,26 @@
                 />
               </div>
 
-              <!-- 右侧：卡牌文本及详情 -->
+              <!-- 右侧：详情与识别标识 -->
               <div class="flex-1 flex flex-col justify-between">
                 <div>
                   <div class="flex justify-between items-start mb-1">
                     <h3 class="font-bold text-white text-base">${card.name}</h3>
                   </div>
-                  <span class="inline-block text-xs px-2 py-0.5 rounded font-semibold bg-slate-700 text-yellow-400 mb-2">
-                    ${card.rarity || '标准'}
-                  </span>
+                  <div class="flex flex-wrap gap-1 mb-2">
+                    <span class="text-xs px-2 py-0.5 rounded font-semibold bg-slate-700 text-yellow-400">
+                      ${card.rarity || '标准'}
+                    </span>
+                    <span class="text-xs px-2 py-0.5 rounded font-mono bg-slate-900 text-slate-300">
+                      ${card.id}
+                    </span>
+                  </div>
                   <p class="text-xs text-slate-400">${card.pack || '基础包'}</p>
                 </div>
               </div>
             </div>
 
-            <!-- 底部按钮区 -->
+            <!-- 操作按钮 -->
             <div class="flex gap-2 pt-3 mt-3 border-t border-slate-700/50">
               <button 
                 onclick='addWantCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
@@ -181,17 +186,30 @@
         ? `<span class="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">已锁定: ${lockedRarity}</span>`
         : '';
 
+      // 愿望单增加微型小缩略图 + ID 编号
       wantList.innerHTML = wantCards.length ? wantCards.map(c => `
-        <div class="flex justify-between items-center text-xs bg-slate-800 px-2.5 py-1.5 rounded">
-          <span class="text-slate-200">${c.name} (${c.rarity})</span>
-          <button onclick="removeItem('want', '${c.id}')" class="text-red-400">✕</button>
+        <div class="flex justify-between items-center bg-slate-800 p-2 rounded border border-slate-700">
+          <div class="flex items-center gap-2">
+            <img src="${c.image}" class="w-8 h-11 object-cover rounded bg-slate-900" onerror="this.src='https://via.placeholder.com/32x44';" />
+            <div>
+              <p class="text-xs font-bold text-slate-200">${c.name}</p>
+              <p class="text-[10px] font-mono text-yellow-400">${c.id} | ${c.rarity}</p>
+            </div>
+          </div>
+          <button onclick="removeItem('want', '${c.id}')" class="text-red-400 text-xs px-2">✕</button>
         </div>
       `).join('') : '<p class="text-slate-500 text-xs text-center py-6">点击下方卡牌 "+ 想要 (Want)"</p>';
 
       haveList.innerHTML = haveCards.length ? haveCards.map(c => `
-        <div class="flex justify-between items-center text-xs bg-slate-800 px-2.5 py-1.5 rounded">
-          <span class="text-slate-200">${c.name} (${c.rarity})</span>
-          <button onclick="removeItem('have', '${c.id}')" class="text-red-400">✕</button>
+        <div class="flex justify-between items-center bg-slate-800 p-2 rounded border border-slate-700">
+          <div class="flex items-center gap-2">
+            <img src="${c.image}" class="w-8 h-11 object-cover rounded bg-slate-900" onerror="this.src='https://via.placeholder.com/32x44';" />
+            <div>
+              <p class="text-xs font-bold text-slate-200">${c.name}</p>
+              <p class="text-[10px] font-mono text-green-400">${c.id} | ${c.rarity}</p>
+            </div>
+          </div>
+          <button onclick="removeItem('have', '${c.id}')" class="text-red-400 text-xs px-2">✕</button>
         </div>
       `).join('') : '<p class="text-slate-500 text-xs text-center py-6">锁定稀有度后选择重复卡</p>';
     }
@@ -200,12 +218,12 @@
       if (!haveCards.length && !wantCards.length) return alert('请先添加卡牌！');
       
       let text = `[Pokémon TCG Pocket Trade Request]\n\n`;
-      text += `🟡 WANT:\n` + (wantCards.map(c => `- ${c.name} (${c.rarity})`).join('\n') || '- None') + `\n\n`;
-      text += `🟢 HAVE:\n` + (haveCards.map(c => `- ${c.name} (${c.rarity})`).join('\n') || '- None') + `\n\n`;
+      text += `🟡 WANT:\n` + (wantCards.map(c => `- ${c.name} [#${c.id}] (${c.rarity})`).join('\n') || '- None') + `\n\n`;
+      text += `🟢 HAVE:\n` + (haveCards.map(c => `- ${c.name} [#${c.id}] (${c.rarity})`).join('\n') || '- None') + `\n\n`;
       text += `DM me if interested!`;
 
       navigator.clipboard.writeText(text);
-      alert('已复制贴文格式到剪贴板！\n\n' + text);
+      alert('已复制贴文格式！已自动附带卡牌编号 [#ID]，确保交易不会混淆：\n\n' + text);
     }
 
     searchInput.addEventListener('input', fetchCards);
