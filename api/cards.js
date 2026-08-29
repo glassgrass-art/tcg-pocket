@@ -2,103 +2,125 @@ export default async function handler(req, res) {
   const { rarity = '', setId = '' } = req.query;
 
   try {
-    const DATA_URL = 'https://raw.githubusercontent.com/chase-mew/pokemon-tcg-pocket-cards/main/data/v5/cards.json';
-    
-    const response = await fetch(DATA_URL, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(10000)
-    });
+    // 1. 全量 Pocket 拓展包 ID 映射（包含目前发布的最新 B4a 火箭队包）
+    const knownSets = [
+      { id: 'A1', name: 'Genetic Apex (最强的基因)' },
+      { id: 'A1a', name: 'Mythical Island (幻之岛)' },
+      { id: 'A2', name: 'Space-Time Smackdown (时空激斗)' },
+      { id: 'A2a', name: 'Triumphant Light (胜者之光)' },
+      { id: 'A2b', name: 'Shining Revelry (璀璨狂欢)' },
+      { id: 'A3', name: 'Celestial Guardians (星宿守护者)' },
+      { id: 'A3a', name: 'Extradimensional Crisis (异次元危机)' },
+      { id: 'A3b', name: 'Eevee Grove (伊布之森)' },
+      { id: 'A4', name: 'Wisdom of Sea and Sky (海空智者)' },
+      { id: 'A4a', name: 'Secluded Springs (幽翠之泉)' },
+      { id: 'A4b', name: 'Deluxe Pack ex (豪华 EX 包)' },
+      { id: 'B1', name: 'Mega Rising (巨兽崛起)' },
+      { id: 'B1a', name: 'Crimson Blaze (绯红烈焰)' },
+      { id: 'B2', name: 'Fantastical Parade (梦幻巡游)' },
+      { id: 'B2a', name: 'Paldean Wonders (帕底亚奇迹)' },
+      { id: 'B2b', name: 'Mega Shine (巨力闪耀)' },
+      { id: 'B3', name: 'Pulsing Aura (脉动气场)' },
+      { id: 'B3a', name: 'Paradox Drive (悖论驱动)' },
+      { id: 'B3b', name: 'Everyday Wonders (日常奇迹)' },
+      { id: 'B4', name: 'Ruler of Skies (天空主宰)' },
+      { id: 'B4a', name: "Team Rocket's Ambition (火箭队的野心)" },
+      { id: 'P-A', name: 'Promos-A (活动特典包)' }
+    ];
 
-    if (!response.ok) {
-      throw new Error(`GitHub Data Fetch Failed: ${response.status}`);
-    }
+    const targetSets = setId ? knownSets.filter(s => s.id.toLowerCase() === setId.toLowerCase()) : knownSets;
 
-    const allCards = await response.json();
-
-    // 严密的稀有度标准化函数（支持 ◇/☆/♛ 符号、英文单词、数字全匹配）
-    function normalizeRarity(rawRarity) {
-      if (!rawRarity) return '1diamond';
-      const r = rawRarity.toString().trim();
+    // 稀有度归一化函数
+    function normalizeRarity(rawRarity, name, localId) {
+      if (!rawRarity && !name) return '1diamond';
+      
+      const r = (rawRarity || '').toString().trim();
       const s = r.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // 1. 优先使用符号判断（解决 v5 数据原生的 ◇ 和 ☆ 存储格式）
-      if (r === '◇' || r === '◆') return '1diamond';
-      if (r === '◇◇' || r === '◆◆') return '2diamond';
-      if (r === '◇◇◇' || r === '◆◆◆') return '3diamond';
-      if (r === '◇◇◇◇' || r === '◆◆◆◆') return '4diamond';
+      // 精确识别文本与符号
+      if (r === '◇' || r === '◆' || s.includes('1diamond') || s === 'common') return '1diamond';
+      if (r === '◇◇' || r === '◆◆' || s.includes('2diamond') || s === 'uncommon') return '2diamond';
+      if (r === '◇◇◇' || r === '◆◆◆' || s.includes('3diamond') || s === 'rare') return '3diamond';
+      if (r === '◇◇◇◇' || r === '◆◆◆◆' || s.includes('4diamond') || s.includes('doublerare') || s === 'rr') return '4diamond';
+
+      if (r === '☆' || r === '★' || s.includes('1star') || s.includes('onestar') || s === 'ar') return '1star';
+      if (r === '☆☆' || r === '★★' || s.includes('2star') || s.includes('twostar') || s === 'sar' || s === 'sr') return '2star';
+      if (r === '☆☆☆' || r === '★★★' || s.includes('3star') || s.includes('threestar') || s === 'ur' || s.includes('immersive')) return '3star';
+      if (r === '♛' || r === '👑' || s.includes('crown')) return 'crown';
+
+      // 当 API 缺失 rarity 属性时，通过卡牌特征算法智能推荐稀有度（Pocket 规则）
+      const cleanName = (name || '').toLowerCase();
+      const num = parseInt(localId, 10);
+
+      // EX 卡必然是 4 菱形 或 2 星级/皇冠
+      if (cleanName.includes(' ex') || cleanName.endsWith('ex')) {
+        return '4diamond';
+      }
       
-      if (r === '☆' || r === '★') return '1star';
-      if (r === '☆☆' || r === '★★') return '2star';
-      if (r === '☆☆☆' || r === '★★★') return '3star';
-      if (r === '♛' || r === '👑') return 'crown';
-
-      // 2. 字符串与数字退化匹配
-      if (s === '1' || s.includes('1diamond') || s.includes('onediamond') || s === 'common') return '1diamond';
-      if (s === '2' || s.includes('2diamond') || s.includes('twodiamond') || s === 'uncommon') return '2diamond';
-      if (s === '3' || s.includes('3diamond') || s.includes('threediamond') || s === 'rare') return '3diamond';
-      if (s === '4' || s.includes('4diamond') || s.includes('fourdiamond') || s.includes('doublerare') || s === 'rr') return '4diamond';
-
-      if (s === '5' || s.includes('1star') || s.includes('onestar') || s === 'ar') return '1star';
-      if (s === '6' || s.includes('2star') || s.includes('twostar') || s === 'sar' || s === 'sr') return '2star';
-      if (s === '7' || s.includes('3star') || s.includes('threestar') || s === 'ur' || s.includes('immersive')) return '3star';
-      if (s === '8' || s.includes('crown')) return 'crown';
+      // 序号大于 200 的多为全图艺术卡 (1star+)
+      if (!isNaN(num)) {
+        if (num > 280) return 'crown';
+        if (num > 240) return '3star';
+        if (num > 200) return '1star';
+      }
 
       return '1diamond';
     }
 
     const targetNormRarity = rarity ? normalizeRarity(rarity) : '';
 
-    const setsMap = {};
+    // 并行获取扩展包内容
+    const fetchSetData = async (setItem) => {
+      try {
+        const res = await fetch(`https://api.tcgdex.net/v2/en/sets/${setItem.id}`, { 
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(5000) 
+        });
 
-    allCards.forEach(card => {
-      // 兼容获取 Set 代码（如 A1, A1a, B4a 等）
-      const currentSetId = card.set_id || card.set?.id || (card.id ? card.id.split('-')[0] : 'Other');
-      const currentSetName = card.set_name || card.set?.name || currentSetId;
-      
-      const rawRarity = card.rarity || card.rarity_name || '';
-      const normRarity = normalizeRarity(rawRarity);
+        if (!res.ok) return null;
+        const setData = await res.json();
+        if (!setData || !setData.cards) return null;
 
-      // 根据目标稀有度准确过滤
-      if (targetNormRarity && normRarity !== targetNormRarity) {
-        return;
+        const formattedCards = setData.cards.map(card => {
+          const rawRarity = card.rarity || '';
+          const normRarity = normalizeRarity(rawRarity, card.name, card.localId || card.id.split('-')[1]);
+          return {
+            id: card.id,
+            localId: card.localId || card.id.split('-').pop(),
+            name: card.name,
+            setId: setItem.id,
+            setName: setItem.name,
+            rarity: rawRarity || normRarity,
+            normRarity: normRarity,
+            image: card.image ? `${card.image}/low.webp` : '',
+            highImage: card.image ? `${card.image}/high.webp` : ''
+          };
+        });
+
+        // 筛选目标稀有度
+        const filteredCards = targetNormRarity
+          ? formattedCards.filter(c => c.normRarity === targetNormRarity)
+          : formattedCards;
+
+        if (filteredCards.length > 0) {
+          return {
+            setId: setItem.id,
+            setName: setItem.name,
+            totalCards: filteredCards.length,
+            cards: filteredCards
+          };
+        }
+      } catch (e) {
+        console.warn(`Failed fetching set ${setItem.id}`);
       }
+      return null;
+    };
 
-      if (setId && currentSetId.toLowerCase() !== setId.toLowerCase()) {
-        return;
-      }
-
-      if (!setsMap[currentSetId]) {
-        setsMap[currentSetId] = {
-          setId: currentSetId,
-          setName: currentSetName,
-          cards: []
-        };
-      }
-
-      let imgUrl = card.image || card.image_url || card.art || '';
-      if (!imgUrl && card.id) {
-        imgUrl = `https://assets.tcgdex.net/en/tcgp/${currentSetId}/${card.local_id || card.id.split('-')[1]}/low.webp`;
-      }
-
-      setsMap[currentSetId].cards.push({
-        id: card.id,
-        name: card.name,
-        setId: currentSetId,
-        setName: currentSetName,
-        rarity: rawRarity || '◇',
-        normRarity: normRarity,
-        image: imgUrl,
-        highImage: imgUrl
-      });
-    });
-
-    const result = Object.values(setsMap).map(set => ({
-      ...set,
-      totalCards: set.cards.length
-    }));
+    const resultsArray = await Promise.all(targetSets.map(fetchSetData));
+    const result = resultsArray.filter(Boolean);
 
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
     res.status(200).json({ data: result });
 
   } catch (error) {
