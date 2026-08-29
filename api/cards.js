@@ -1,53 +1,52 @@
 export default async function handler(req, res) {
-  const { search = '', page = 1, limit = 30 } = req.query;
+  const { rarity = '', setId = '' } = req.query;
 
   try {
-    // 涵盖 Pocket 目前发行的核心及补充扩展包列表
+    // 涵盖 Pocket 目前的主要扩展包和 Promo 卡
     const setIds = ['A1', 'A1a', 'P-A']; 
     
-    // 并发获取所有 Set 的卡牌数据
-    const setPromises = setIds.map(setId => 
-      fetch(`https://api.tcgdex.net/v2/en/sets/${setId}`)
-        .then(r => r.ok ? r.json() : { cards: [] })
-        .catch(() => ({ cards: [] }))
+    // 如果指定了 setId，只请求单包（极速）；没指定则请求已定义的扩展包
+    const targetSets = setId ? [setId] : setIds;
+
+    const setPromises = targetSets.map(id => 
+      fetch(`https://api.tcgdex.net/v2/en/sets/${id}`)
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
     );
 
-    const setsData = await Promise.all(setPromises);
+    const setsData = (await Promise.all(setPromises)).filter(Boolean);
 
-    // 扁平化整合全量卡牌
-    let allCards = [];
+    let result = [];
+
     setsData.forEach(setData => {
       if (setData && setData.cards) {
-        const setCards = setData.cards.map(card => ({
+        let cards = setData.cards.map(card => ({
           id: card.id,
           name: card.name,
-          pack: setData.name || 'TCG Pocket',
+          setId: setData.id,
+          setName: setData.name || setData.id,
           rarity: card.rarity || 'Standard',
-          // 使用 low.webp 做低延迟预览，点开大图再载入 high.webp
           image: card.image ? `${card.image}/low.webp` : '',
           highImage: card.image ? `${card.image}/high.webp` : ''
         }));
-        allCards = allCards.concat(setCards);
+
+        // 稀有度过滤
+        if (rarity) {
+          cards = cards.filter(c => c.rarity.toLowerCase() === rarity.toLowerCase());
+        }
+
+        if (cards.length > 0) {
+          result.push({
+            setId: setData.id,
+            setName: setData.name || setData.id,
+            totalCards: cards.length,
+            cards: cards
+          });
+        }
       }
     });
 
-    // 关键字检索（支持按卡名或编号）
-    if (search) {
-      const kw = search.toLowerCase();
-      allCards = allCards.filter(c => 
-        c.name.toLowerCase().includes(kw) || 
-        c.id.toLowerCase().includes(kw)
-      );
-    }
-
-    // 分页截取，防止前端卡顿
-    const startIndex = (parseInt(page) - 1) * parseInt(limit);
-    const paginatedCards = allCards.slice(startIndex, startIndex + parseInt(limit));
-
-    res.status(200).json({ 
-      data: paginatedCards, 
-      total: allCards.length 
-    });
+    res.status(200).json({ data: result });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch cards' });
