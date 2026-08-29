@@ -87,17 +87,33 @@
 
         return `
           <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col justify-between ${isMismatched ? 'opacity-30' : ''}">
-            <div>
-              <div class="flex justify-between items-start mb-1">
-                <h3 class="font-bold text-white">${card.name}</h3>
-                <span class="text-xs px-2 py-0.5 rounded font-semibold bg-slate-700 text-yellow-400">
-                  ${card.rarity || '标准'}
-                </span>
+            <div class="flex gap-4">
+              <!-- 左侧：卡牌图片展示区 -->
+              <div class="w-24 h-36 flex-shrink-0 rounded-lg overflow-hidden bg-slate-900 border border-slate-700 shadow-md">
+                <img 
+                  src="${card.image}" 
+                  alt="${card.name}" 
+                  class="w-full h-full object-cover"
+                  onerror="this.onerror=null; this.src='https://via.placeholder.com/150x210/1e293b/94a3b8?text=No+Image';"
+                />
               </div>
-              <p class="text-xs text-slate-400 mb-3">${card.pack || '基础包'}</p>
+
+              <!-- 右侧：卡牌文本及详情 -->
+              <div class="flex-1 flex flex-col justify-between">
+                <div>
+                  <div class="flex justify-between items-start mb-1">
+                    <h3 class="font-bold text-white text-base">${card.name}</h3>
+                  </div>
+                  <span class="inline-block text-xs px-2 py-0.5 rounded font-semibold bg-slate-700 text-yellow-400 mb-2">
+                    ${card.rarity || '标准'}
+                  </span>
+                  <p class="text-xs text-slate-400">${card.pack || '基础包'}</p>
+                </div>
+              </div>
             </div>
 
-            <div class="flex gap-2 pt-2 border-t border-slate-700/50">
+            <!-- 底部按钮区 -->
+            <div class="flex gap-2 pt-3 mt-3 border-t border-slate-700/50">
               <button 
                 onclick='addWantCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
                 ${isMismatched ? 'disabled' : ''}
