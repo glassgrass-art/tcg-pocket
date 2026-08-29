@@ -37,29 +37,17 @@
 
           <!-- 稀有度按钮组 -->
           <div id="raritySelector" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <button onclick="selectRarity('1diamond', '♢ 1 菱形')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
-              ♢ 1 菱形
-            </button>
-            <button onclick="selectRarity('2diamond', '♢♢ 2 菱形')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
-              ♢♢ 2 菱形
-            </button>
-            <button onclick="selectRarity('3diamond', '♢♢♢ 3 菱形')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
-              ♢♢♢ 3 菱形
-            </button>
-            <button onclick="selectRarity('4diamond', '♢♢♢♢ 4 菱形')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
-              ♢♢♢♢ 4 菱形
-            </button>
-            <button onclick="selectRarity('1star', '⭐ 1 星级')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
-              ⭐ 1 星级
-            </button>
-            <button onclick="selectRarity('2star', '⭐⭐ 2 星级')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
-              ⭐⭐ 2 星级
-            </button>
-            <button onclick="selectRarity('3star', '⭐⭐⭐ 3 星级')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
-              ⭐⭐⭐ 3 星级
-            </button>
-            <button onclick="selectRarity('crown', '👑 皇冠 Crown')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-amber-400">
-              👑 皇冠 Crown
+           <!-- 第一步：稀有度筛选 HTML 示例 -->
+<button onclick="selectRarity('1diamond')">◇ 1 菱形</button>
+<button onclick="selectRarity('2diamond')">◇◇ 2 菱形</button>
+<button onclick="selectRarity('3diamond')">◇◇◇ 3 菱形</button>
+<button onclick="selectRarity('4diamond')">◇◇◇◇ 4 菱形</button>
+
+<button onclick="selectRarity('1star')">★ 1 星级</button>
+<button onclick="selectRarity('2star')">★★ 2 星级</button>
+<button onclick="selectRarity('3star')">★★★ 3 星级</button>
+<button onclick="selectRarity('shinystar')">✨ 彩星</button> <!-- 新增彩星按钮 -->
+<button onclick="selectRarity('crown')">♛ 皇冠 Crown</button>
             </button>
           </div>
         </div>
