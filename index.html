@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokémon TCG Pocket 卡牌库</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-6">
+  <div class="max-w-5xl mx-auto">
+    <!-- 头部标语 -->
+    <header class="mb-8 text-center">
+      <h1 class="text-3xl font-bold tracking-wide text-yellow-400">Pokémon TCG Pocket Database</h1>
+      <p class="text-slate-400 mt-2">专为 Pocket 手游打造的轻量卡牌检索工具</p>
+    </header>
+
+    <!-- 筛选控制面板 -->
+    <div class="flex flex-col sm:flex-row gap-4 mb-8">
+      <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="搜索卡牌名称 (如 Pikachu)..." 
+        class="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-yellow-400"
+      />
+      <select 
+        id="typeSelect" 
+        class="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-yellow-400"
+      >
+        <option value="">全部属性 (All Types)</option>
+        <option value="Lightning">电 (Lightning)</option>
+        <option value="Darkness">恶 (Darkness)</option>
+        <option value="Water">水 (Water)</option>
+        <option value="Fire">火 (Fire)</option>
+        <option value="Grass">草 (Grass)</option>
+        <option value="Fighting">斗 (Fighting)</option>
+        <option value="Psychic">超 (Psychic)</option>
+        <option value="Metal">钢 (Metal)</option>
+        <option value="Colorless">无 (Colorless)</option>
+        <option value="Trainer">训练家 (Trainer)</option>
+      </select>
+    </div>
+
+    <!-- 卡牌网格展示区 -->
+    <div id="cardsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      <p class="text-slate-500 col-span-full text-center py-8">正在加载卡牌数据...</p>
+    </div>
+  </div>
+
+  <script>
+    const searchInput = document.getElementById('searchInput');
+    const typeSelect = document.getElementById('typeSelect');
+    const cardsGrid = document.getElementById('cardsGrid');
+
+    // 从我们刚才搭建的 API 拉取数据
+    async function fetchCards() {
+      const search = searchInput.value.trim();
+      const type = typeSelect.value;
+      
+      let url = '/api/cards?';
+      if (search) url += `search=${encodeURIComponent(search)}&`;
+      if (type) {
+        if (type === 'Trainer') {
+          url += `card_type=Trainer&`;
+        } else {
+          url += `type=${encodeURIComponent(type)}&`;
+        }
+      }
+
+      try {
+        const res = await fetch(url);
+        const result = await res.json();
+        renderCards(result.data || []);
+      } catch (err) {
+        cardsGrid.innerHTML = `<p class="text-red-400 col-span-full text-center">数据加载失败，请重试。</p>`;
+      }
+    }
+
+    // 渲染卡牌 HTML
+    function renderCards(cards) {
+      if (cards.length === 0) {
+        cardsGrid.innerHTML = `<p class="text-slate-500 col-span-full text-center py-8">未找到匹配的卡牌</p>`;
+        return;
+      }
+
+      cardsGrid.innerHTML = cards.map(card => `
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 hover:border-yellow-400 transition shadow-lg flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <h2 class="text-xl font-bold text-white">${card.name}</h2>
+              <span class="text-xs px-2 py-1 rounded font-semibold ${card.type === 'Lightning' ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40' : 'bg-slate-700 text-slate-300'}">
+                ${card.type || card.card_type}
+              </span>
+            </div>
+            
+            ${card.hp ? `<p class="text-sm text-slate-400 mb-3">HP: <span class="text-slate-200 font-bold">${card.hp}</span> ${card.stage ? `| ${card.stage}` : ''}</p>` : ''}
+
+            <div class="space-y-2 mb-4">
+              ${card.attacks ? card.attacks.map(atk => `
+                <div class="bg-slate-900/60 p-2.5 rounded border border-slate-800">
+                  <div class="flex justify-between font-semibold text-sm">
+                    <span class="text-yellow-400">${atk.name}</span>
+                    <span class="text-slate-300">${atk.damage}</span>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-1">${atk.text}</p>
+                </div>
+              `).join('') : `<p class="text-sm text-slate-300 bg-slate-900/60 p-2.5 rounded">${card.text}</p>`}
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-700/50 flex justify-between text-xs text-slate-500">
+            <span>稀有度: ${card.rarity || '标准'}</span>
+            <span>编号: ${card.id}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 事件监听
+    searchInput.addEventListener('input', fetchCards);
+    typeSelect.addEventListener('change', fetchCards);
+
+    // 初始化运行
+    fetchCards();
+  </script>
+</body>
+</html>
