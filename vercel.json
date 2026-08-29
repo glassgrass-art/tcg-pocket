@@ -1,0 +1,9 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/cards",
+      "destination": "/api/cards.js"
+    }
+  ]
+}
