@@ -1,126 +1,199 @@
-const searchInput = document.getElementById('searchInput');
-const cardsGrid = document.getElementById('cardsGrid');
-const haveList = document.getElementById('haveList');
-const wantList = document.getElementById('wantList');
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokémon TCG Pocket 卡牌交换匹配器</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-6">
+  <div class="max-w-7xl mx-auto">
+    <!-- 头部 -->
+    <header class="mb-6 text-center">
+      <h1 class="text-3xl font-bold tracking-wide text-yellow-400">Pokémon TCG Pocket Trade Matcher</h1>
+      <p class="text-slate-400 mt-1">先选想要卡锁定稀有度，再匹配同等稀有度的重复卡</p>
+    </header>
 
-let haveCards = [];
-let wantCards = [];
-let lockedRarity = null; // 当前锁定的稀有度
-
-async function fetchCards() {
-  const search = searchInput.value.trim();
-  let url = '/api/cards?';
-  if (search) url += `search=${encodeURIComponent(search)}`;
-
-  const res = await fetch(url);
-  const result = await res.json();
-  renderCards(result.data || []);
-}
-
-function renderCards(cards) {
-  cardsGrid.innerHTML = cards.map(card => {
-    // 校验当前卡牌是否符合已被锁定的稀有度
-    const isRarityMismatch = lockedRarity && card.rarity !== lockedRarity;
-
-    return `
-      <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col justify-between ${isRarityMismatch ? 'opacity-40' : ''}">
-        <div>
-          <div class="flex justify-between items-start mb-1">
-            <h3 class="font-bold text-white">${card.name}</h3>
-            <span class="text-xs px-2 py-0.5 rounded font-semibold bg-slate-700 text-yellow-400">
-              ${card.rarity || '标准'}
-            </span>
-          </div>
-          <p class="text-xs text-slate-400 mb-3">${card.pack || '基础包'}</p>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- 左侧：卡牌检索 -->
+      <div class="lg:col-span-2">
+        <div class="flex flex-col sm:flex-row gap-4 mb-6">
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="搜索要交换的卡牌..." 
+            class="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-yellow-400"
+          />
         </div>
-
-        <div class="flex gap-2 pt-2 border-t border-slate-700/50">
-          <!-- 1. 想要按钮：如果是第一张，自动锁定稀有度 -->
-          <button 
-            onclick='addWantCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
-            ${isRarityMismatch ? 'disabled' : ''}
-            class="flex-1 py-1.5 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-slate-900 disabled:hover:bg-transparent disabled:hover:text-yellow-400 rounded font-bold text-xs transition disabled:cursor-not-allowed"
-          >
-            + 想要 (Want)
-          </button>
-
-          <!-- 2. 我有按钮：只有同等稀有度才允许点击 -->
-          <button 
-            onclick='addHaveCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
-            ${!lockedRarity || isRarityMismatch ? 'disabled' : ''}
-            class="flex-1 py-1.5 bg-green-500/20 text-green-400 hover:bg-green-500 hover:text-slate-900 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-green-400 rounded font-bold text-xs transition disabled:cursor-not-allowed"
-            title="${!lockedRarity ? '请先选择想要的卡牌以锁定稀有度' : ''}"
-          >
-            + 我有 (Have)
-          </button>
-        </div>
+        <div id="cardsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
       </div>
-    `;
-  }).join('');
-}
 
-// 步骤 1：先选想要的卡（锁定稀有度）
-function addWantCard(card) {
-  if (!lockedRarity) {
-    lockedRarity = card.rarity; // 锁定稀有度！
-  } else if (card.rarity !== lockedRarity) {
-    alert(`Pocket 规则：只能交换同等稀有度的卡牌！当前已锁定为 [${lockedRarity}]`);
-    return;
-  }
+      <!-- 右侧：交换愿望单 -->
+      <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 h-fit sticky top-6 space-y-6">
+        <!-- 我想要的 (Want) -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="text-lg font-bold text-yellow-400">🟡 第一步：我想要的 (Want)</h2>
+            <span id="rarityBadge" class="text-xs text-slate-400"></span>
+          </div>
+          <div id="wantList" class="space-y-1.5 min-h-[80px] bg-slate-900/50 p-2 rounded border border-slate-700/50">
+            <p class="text-slate-500 text-xs text-center py-6">点击下方卡牌 "+ 想要 (Want)"</p>
+          </div>
+        </div>
 
-  if (!wantCards.some(c => c.id === card.id)) {
-    wantCards.push(card);
-    updateTradeUI();
-    fetchCards(); // 重新渲染列表以更新置灰状态
-  }
-}
+        <!-- 我拥有的 (Have) -->
+        <div>
+          <h2 class="text-lg font-bold text-green-400 mb-2">🟢 第二步：我有的 (Have)</h2>
+          <div id="haveList" class="space-y-1.5 min-h-[80px] bg-slate-900/50 p-2 rounded border border-slate-700/50">
+            <p class="text-slate-500 text-xs text-center py-6">锁定稀有度后选择重复卡</p>
+          </div>
+        </div>
 
-// 步骤 2：再选拥有的重复卡
-function addHaveCard(card) {
-  if (card.rarity !== lockedRarity) {
-    alert(`必须选择同为 [${lockedRarity}] 稀有度的卡牌进行交换！`);
-    return;
-  }
-
-  if (!haveCards.some(c => c.id === card.id)) {
-    haveCards.push(card);
-    updateTradeUI();
-  }
-}
-
-function removeItem(type, id) {
-  if (type === 'want') {
-    wantCards = wantCards.filter(c => c.id !== id);
-    // 如果想要列表清空了，解锁稀有度
-    if (wantCards.length === 0 && haveCards.length === 0) {
-      lockedRarity = null;
-    }
-  } else {
-    haveCards = haveCards.filter(c => c.id !== id);
-    if (wantCards.length === 0 && haveCards.length === 0) {
-      lockedRarity = null;
-    }
-  }
-  updateTradeUI();
-  fetchCards();
-}
-
-function updateTradeUI() {
-  const rarityBadge = lockedRarity 
-    ? `<span class="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">已锁定: ${lockedRarity}</span>`
-    : `<span class="text-xs text-slate-500">（请先选择想要卡）</span>`;
-
-  haveList.innerHTML = haveCards.length ? haveCards.map(c => `
-    <div class="flex justify-between items-center text-xs bg-slate-800 px-2.5 py-1.5 rounded">
-      <span class="text-slate-200">${c.name}</span>
-      <button onclick="removeItem('have', '${c.id}')" class="text-red-400">✕</button>
+        <!-- 导出一键贴 -->
+        <button 
+          onclick="exportTradePost()" 
+          class="w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold rounded-lg transition"
+        >
+          复制交换帖 (Format for Reddit/Discord)
+        </button>
+      </div>
     </div>
-  `).join('') : '<p class="text-slate-500 text-xs text-center py-6">请选择同稀有度的重复卡</p>';
+  </div>
 
-  wantList.innerHTML = wantCards.length ? wantCards.map(c => `
-    <div class="flex justify-between items-center text-xs bg-slate-800 px-2.5 py-1.5 rounded">
-      <span class="text-slate-200">${c.name}</span>
-      <button onclick="removeItem('want', '${c.id}')" class="text-red-400">✕</button>
-    </div>
-  `).join('') : `<p class="text-slate-500 text-xs text-center py-6">第一步：点击上方卡牌的 "+想要"</p>`;
-}
+  <script>
+    const searchInput = document.getElementById('searchInput');
+    const cardsGrid = document.getElementById('cardsGrid');
+    const haveList = document.getElementById('haveList');
+    const wantList = document.getElementById('wantList');
+    const rarityBadge = document.getElementById('rarityBadge');
+
+    let haveCards = [];
+    let wantCards = [];
+    let lockedRarity = null;
+
+    async function fetchCards() {
+      const search = searchInput.value.trim();
+      let url = '/api/cards?';
+      if (search) url += `search=${encodeURIComponent(search)}`;
+
+      const res = await fetch(url);
+      const result = await res.json();
+      renderCards(result.data || []);
+    }
+
+    function renderCards(cards) {
+      cardsGrid.innerHTML = cards.map(card => {
+        const isMismatched = lockedRarity && card.rarity !== lockedRarity;
+
+        return `
+          <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col justify-between ${isMismatched ? 'opacity-30' : ''}">
+            <div>
+              <div class="flex justify-between items-start mb-1">
+                <h3 class="font-bold text-white">${card.name}</h3>
+                <span class="text-xs px-2 py-0.5 rounded font-semibold bg-slate-700 text-yellow-400">
+                  ${card.rarity || '标准'}
+                </span>
+              </div>
+              <p class="text-xs text-slate-400 mb-3">${card.pack || '基础包'}</p>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t border-slate-700/50">
+              <button 
+                onclick='addWantCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
+                ${isMismatched ? 'disabled' : ''}
+                class="flex-1 py-1.5 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-slate-900 rounded font-bold text-xs transition disabled:cursor-not-allowed"
+              >
+                + 想要 (Want)
+              </button>
+              <button 
+                onclick='addHaveCard(${JSON.stringify(card).replace(/'/g, "&apos;")})'
+                ${!lockedRarity || isMismatched ? 'disabled' : ''}
+                class="flex-1 py-1.5 bg-green-500/20 text-green-400 hover:bg-green-500 hover:text-slate-900 rounded font-bold text-xs transition disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                + 我有 (Have)
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function addWantCard(card) {
+      if (!lockedRarity) {
+        lockedRarity = card.rarity;
+      } else if (card.rarity !== lockedRarity) {
+        alert(`Pocket 规则：只能交换同等稀有度的卡牌！当前已锁定为 [${lockedRarity}]`);
+        return;
+      }
+
+      if (!wantCards.some(c => c.id === card.id)) {
+        wantCards.push(card);
+        updateTradeUI();
+        fetchCards();
+      }
+    }
+
+    function addHaveCard(card) {
+      if (card.rarity !== lockedRarity) {
+        alert(`必须选择同为 [${lockedRarity}] 稀有度的卡牌！`);
+        return;
+      }
+
+      if (!haveCards.some(c => c.id === card.id)) {
+        haveCards.push(card);
+        updateTradeUI();
+      }
+    }
+
+    function removeItem(type, id) {
+      if (type === 'want') {
+        wantCards = wantCards.filter(c => c.id !== id);
+      } else {
+        haveCards = haveCards.filter(c => c.id !== id);
+      }
+
+      if (wantCards.length === 0 && haveCards.length === 0) {
+        lockedRarity = null;
+      }
+
+      updateTradeUI();
+      fetchCards();
+    }
+
+    function updateTradeUI() {
+      rarityBadge.innerHTML = lockedRarity 
+        ? `<span class="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">已锁定: ${lockedRarity}</span>`
+        : '';
+
+      wantList.innerHTML = wantCards.length ? wantCards.map(c => `
+        <div class="flex justify-between items-center text-xs bg-slate-800 px-2.5 py-1.5 rounded">
+          <span class="text-slate-200">${c.name} (${c.rarity})</span>
+          <button onclick="removeItem('want', '${c.id}')" class="text-red-400">✕</button>
+        </div>
+      `).join('') : '<p class="text-slate-500 text-xs text-center py-6">点击下方卡牌 "+ 想要 (Want)"</p>';
+
+      haveList.innerHTML = haveCards.length ? haveCards.map(c => `
+        <div class="flex justify-between items-center text-xs bg-slate-800 px-2.5 py-1.5 rounded">
+          <span class="text-slate-200">${c.name} (${c.rarity})</span>
+          <button onclick="removeItem('have', '${c.id}')" class="text-red-400">✕</button>
+        </div>
+      `).join('') : '<p class="text-slate-500 text-xs text-center py-6">锁定稀有度后选择重复卡</p>';
+    }
+
+    function exportTradePost() {
+      if (!haveCards.length && !wantCards.length) return alert('请先添加卡牌！');
+      
+      let text = `[Pokémon TCG Pocket Trade Request]\n\n`;
+      text += `🟡 WANT:\n` + (wantCards.map(c => `- ${c.name} (${c.rarity})`).join('\n') || '- None') + `\n\n`;
+      text += `🟢 HAVE:\n` + (haveCards.map(c => `- ${c.name} (${c.rarity})`).join('\n') || '- None') + `\n\n`;
+      text += `DM me if interested!`;
+
+      navigator.clipboard.writeText(text);
+      alert('已复制贴文格式到剪贴板！\n\n' + text);
+    }
+
+    searchInput.addEventListener('input', fetchCards);
+    fetchCards();
+  </script>
+</body>
+</html>
