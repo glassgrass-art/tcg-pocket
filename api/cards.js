@@ -1,47 +1,41 @@
-import cardsData from '../cards.json';
+export default async function handler(req, res) {
+  const { search = '' } = req.query;
 
-export default function handler(req, res) {
-  // 设置 CORS 跨域标头，方便前端随时调用
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+  try {
+    // 1. 从开源 TCG Pocket 数据源拉取全量 A1 (最强的基因) 卡牌列表
+    // 支持全量卡图、编号、稀有度
+    const response = await fetch('https://api.tcgdex.net/v2/en/series/tcgp');
+    const seriesData = await response.json();
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    // 2. 拿到所有 Pocket 扩展包 (如 A1, A1a 等)
+    let allCards = [];
+    
+    // 如果获取成功，遍历数据（这里默认拉取核心扩展包卡池）
+    const setRes = await fetch('https://api.tcgdex.net/v2/en/sets/A1');
+    const setData = await setRes.json();
+    
+    if (setData && setData.cards) {
+      allCards = setData.cards.map(card => ({
+        id: card.id.replace('A1-', 'A1-'),
+        name: card.name,
+        pack: 'Genetic Apex (最强的基因)',
+        rarity: card.rarity || 'Standard',
+        image: card.image ? `${card.image}/high.webp` : 'https://via.placeholder.com/300x420'
+      }));
+    }
+
+    // 3. 过滤搜索关键字
+    if (search) {
+      const keyword = search.toLowerCase();
+      allCards = allCards.filter(c => 
+        c.name.toLowerCase().includes(keyword) || 
+        c.id.toLowerCase().includes(keyword)
+      );
+    }
+
+    res.status(200).json({ data: allCards });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch full card database' });
   }
-
-  const { type, card_type, search, id } = req.query;
-  let results = cardsData;
-
-  // 根据 ID 精确查询
-  if (id) {
-    const card = results.find(c => c.id === id);
-    if (!card) return res.status(404).json({ message: 'Card not found' });
-    return res.status(200).json(card);
-  }
-
-  // 按属性 (Lightning, Darkness等) 筛选
-  if (type) {
-    results = results.filter(card => card.type && card.type.toLowerCase() === type.toLowerCase());
-  }
-
-  // 按卡牌大类 (Pokémon 或 Trainer) 筛选
-  if (card_type) {
-    results = results.filter(card => card.card_type && card.card_type.toLowerCase() === card_type.toLowerCase());
-  }
-
-  // 按名称模糊搜索
-  if (search) {
-    results = results.filter(card => card.name.toLowerCase().includes(search.toLowerCase()));
-  }
-
-  return res.status(200).json({
-    total: results.length,
-    data: results
-  });
 }
