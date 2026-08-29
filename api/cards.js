@@ -1,4 +1,8 @@
 module.exports = async function handler(req, res) {
+  // 允许跨域
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+
   const { rarity = '', setId = '' } = req.query || {};
 
   try {
@@ -6,87 +10,72 @@ module.exports = async function handler(req, res) {
     
     const response = await fetch(DATA_URL, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(9000)
     });
 
     if (!response.ok) {
-      throw new Error(`Data Fetch Failed: ${response.status}`);
+      throw new Error(`Upstream Data Fetch Failed: ${response.status}`);
     }
 
     const allCards = await response.json();
 
-    // 严密的稀有度归一化函数
-    function normalizeRarity(rawRarity, isShiny = false) {
-      const r = (rawRarity || '').toString().trim();
-      const s = r.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-      if (isShiny || s.includes('shiny') || r.startsWith('S')) {
-        if (s.includes('2') || s.includes('two') || r === 'SS' || r === '☆☆' || r === '★★') {
-          return 'shinystar2';
-        }
-        return 'shinystar1';
-      }
-
-      if (r === '◇' || r === '◆' || s === '1' || s.includes('onediamond') || s.includes('1diamond') || s === 'common') {
-        return '1diamond';
-      }
-      if (r === '◇◇' || r === '◆◆' || s === '2' || s.includes('twodiamonds') || s.includes('twodiamond') || s.includes('2diamond') || s === 'uncommon') {
-        return '2diamond';
-      }
-      if (r === '◇◇◇' || r === '◆◆◆' || s === '3' || s.includes('threediamonds') || s.includes('threediamond') || s.includes('3diamond') || s === 'rare') {
-        return '3diamond';
-      }
-      if (r === '◇◇◇◇' || r === '◆◆◆◆' || s === '4' || s.includes('fourdiamonds') || s.includes('fourdiamond') || s.includes('4diamond') || s.includes('doublerare') || s === 'rr') {
-        return '4diamond';
-      }
-
-      if (r === '☆' || r === '★' || s.includes('onestar') || s.includes('1star') || s === 'ar') return '1star';
-      if (r === '☆☆' || r === '★★' || s.includes('twostars') || s.includes('twostar') || s.includes('2star') || s === 'sar' || s === 'sr') return '2star';
-      if (r === '☆☆☆' || r === '★★★' || s.includes('threestars') || s.includes('threestar') || s.includes('3star') || s === 'ur' || s.includes('immersive')) return '3star';
-      
-      if (r === '♛' || r === '👑' || s.includes('crown')) return 'crown';
-
-      return '1diamond';
+    // 核心稀有度映射函数：根据 Pocket 官方符号归一化
+    function parseNormRarity(rawRarity = '') {
+      const r = rawRarity.trim();
+      if (r === '◇') return '1diamond';
+      if (r === '◇◇') return '2diamond';
+      if (r === '◇◇◇') return '3diamond';
+      if (r === '◇◇◇◇') return '4diamond';
+      if (r === '☆') return '1star';
+      if (r === '☆☆' || r === '★') return '2star';
+      if (r === '☆☆☆') return '3star';
+      if (r === '👑' || r === '♛') return 'crown';
+      if (r.toUpperCase().includes('SHINY') || r.toUpperCase().startsWith('S')) return 'shinystar1';
+      return 'other';
     }
 
     const targetNormRarity = rarity ? rarity.toLowerCase() : '';
+    const targetSetId = setId ? setId.toLowerCase() : '';
     const setsMap = {};
 
     allCards.forEach(card => {
-      const setObj = card.set || {};
-      const currentSetId = card.set_id || setObj.id || (card.id ? card.id.split('-')[0].toUpperCase() : 'OTHER');
-      const rawSetName = card.set_name || setObj.name || currentSetId;
-      const currentSetName = `${rawSetName} (${currentSetId})`;
+      // 获取卡牌所属的系列ID (例如 a1, a1a, pa 等)
+      const currentSetId = (card.set_code || (card.id ? card.id.split('-')[0] : 'other')).toLowerCase();
+      const rawSetName = card.set_name || currentSetId.toUpperCase();
+      const currentSetName = `${rawSetName} (${currentSetId.toUpperCase()})`;
 
-      const rawRarity = card.rarity || '';
-      const normRarity = normalizeRarity(rawRarity, card.shiny || card.is_shiny);
+      // 过滤系列
+      if (targetSetId && currentSetId !== targetSetId) {
+        return;
+      }
 
+      const rawRarity = card.rarity || '◇';
+      const normRarity = parseNormRarity(rawRarity);
+
+      // 过滤稀有度
       if (targetNormRarity && normRarity !== targetNormRarity) {
         return;
       }
 
-      if (setId && currentSetId.toLowerCase() !== setId.toLowerCase()) {
-        return;
-      }
-
+      // 初始化系列分组
       if (!setsMap[currentSetId]) {
         setsMap[currentSetId] = {
-          setId: currentSetId,
+          setId: currentSetId.toUpperCase(),
           setName: currentSetName,
           cards: []
         };
       }
 
-      const imgUrl = card.image || card.image_url || card.art || 
-        `https://assets.tcgdex.net/en/tcgp/${currentSetId}/${card.local_id || (card.id ? card.id.split('-')[1] : '')}/low.webp`;
+      // 提取图片链接
+      const imgUrl = card.image || `https://raw.githubusercontent.com/chase-mew/pokemon-tcg-pocket-cards/main/images/webp/cards/${currentSetId}/${card.id.split('-')[1] || card.id}.webp`;
 
       setsMap[currentSetId].cards.push({
         id: card.id,
         name: card.name,
-        setId: currentSetId,
+        setId: currentSetId.toUpperCase(),
         setName: currentSetName,
-        rarity: rawRarity || normRarity,
-        normRarity: normRarity,
+        rarity: rawRarity,       // 原生符号，如 "◇", "◇◇", "☆"
+        normRarity: normRarity,   // 归一化英文，如 "1diamond", "1star"
         image: imgUrl
       });
     });
@@ -96,12 +85,14 @@ module.exports = async function handler(req, res) {
       totalCards: set.cards.length
     }));
 
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
-    return res.status(200).json({ data: result });
+    return res.status(200).json({ success: true, data: result });
 
   } catch (error) {
     console.error('API Error:', error);
-    return res.status(500).json({ error: 'Failed to fetch cards database', details: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to process cards database', 
+      details: error.message 
+    });
   }
 };
