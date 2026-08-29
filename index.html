@@ -35,30 +35,30 @@
             </button>
           </div>
 
-          <!-- 稀有度按钮组 (根据 TCG Pocket 常见稀有度设置) -->
+          <!-- 稀有度按钮组 -->
           <div id="raritySelector" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <button onclick="selectRarity('One Diamond')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
+            <button onclick="selectRarity('1diamond', '♢ 1 菱形')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
               ♢ 1 菱形
             </button>
-            <button onclick="selectRarity('Two Diamond')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
+            <button onclick="selectRarity('2diamond', '♢♢ 2 菱形')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
               ♢♢ 2 菱形
             </button>
-            <button onclick="selectRarity('Three Diamond')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
+            <button onclick="selectRarity('3diamond', '♢♢♢ 3 菱形')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
               ♢♢♢ 3 菱形
             </button>
-            <button onclick="selectRarity('Four Diamond')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
+            <button onclick="selectRarity('4diamond', '♢♢♢♢ 4 菱形')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition">
               ♢♢♢♢ 4 菱形
             </button>
-            <button onclick="selectRarity('One Star')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
+            <button onclick="selectRarity('1star', '⭐ 1 星级')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
               ⭐ 1 星级
             </button>
-            <button onclick="selectRarity('Two Star')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
+            <button onclick="selectRarity('2star', '⭐⭐ 2 星级')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
               ⭐⭐ 2 星级
             </button>
-            <button onclick="selectRarity('Three Star')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
+            <button onclick="selectRarity('3star', '⭐⭐⭐ 3 星级')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-yellow-300">
               ⭐⭐⭐ 3 星级
             </button>
-            <button onclick="selectRarity('Crown')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-amber-400">
+            <button onclick="selectRarity('crown', '👑 皇冠 Crown')" class="rarity-btn py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-center font-bold text-sm transition text-amber-400">
               👑 皇冠 Crown
             </button>
           </div>
@@ -113,24 +113,26 @@
   </div>
 
   <script>
-    let selectedRarity = null;
+    let selectedRarityKey = null;
+    let selectedRarityLabel = '';
     let setsDataCache = [];
     let wantCards = [];
     let haveCards = [];
 
-    async function selectRarity(rarity) {
-      if ((wantCards.length || haveCards.length) && selectedRarity !== rarity) {
+    async function selectRarity(rarityKey, label) {
+      if ((wantCards.length || haveCards.length) && selectedRarityKey !== rarityKey) {
         if (!confirm(`更换稀有度将清空当前已选的交换清单，确定切换吗？`)) return;
         wantCards = [];
         haveCards = [];
         updateTradeUI();
       }
 
-      selectedRarity = rarity;
+      selectedRarityKey = rarityKey;
+      selectedRarityLabel = label;
       
-      // 高亮选中的稀有度按钮
+      // 高亮选中的按钮
       document.querySelectorAll('.rarity-btn').forEach(btn => {
-        if (btn.innerText.includes(rarity) || btn.getAttribute('onclick').includes(rarity)) {
+        if (btn.getAttribute('onclick').includes(`'${rarityKey}'`)) {
           btn.classList.add('border-yellow-400', 'bg-yellow-500/10', 'text-yellow-400');
         } else {
           btn.classList.remove('border-yellow-400', 'bg-yellow-500/10', 'text-yellow-400');
@@ -140,12 +142,12 @@
       document.getElementById('resetRarityBtn').classList.remove('hidden');
       document.getElementById('emptyPrompt').classList.add('hidden');
       document.getElementById('step2Container').classList.remove('hidden');
-      document.getElementById('selectedRarityLabel').innerText = rarity;
+      document.getElementById('selectedRarityLabel').innerText = label;
 
-      // 拉取数据
-      document.getElementById('setTree').innerHTML = `<p class="text-center py-8 text-slate-400 text-sm">正在加载卡牌分类数据...</p>`;
+      // 显示 Loading
+      document.getElementById('setTree').innerHTML = `<p class="text-center py-8 text-slate-400 text-sm">正在检索各个扩展包中的卡牌数据...</p>`;
       
-      const res = await fetch(`/api/cards?rarity=${encodeURIComponent(rarity)}`);
+      const res = await fetch(`/api/cards?rarity=${encodeURIComponent(rarityKey)}`);
       const result = await res.json();
       setsDataCache = result.data || [];
 
@@ -156,7 +158,7 @@
       if (wantCards.length || haveCards.length) {
         if (!confirm('确定要重置并清空已选列表吗？')) return;
       }
-      selectedRarity = null;
+      selectedRarityKey = null;
       wantCards = [];
       haveCards = [];
       updateTradeUI();
@@ -177,7 +179,6 @@
 
       treeContainer.innerHTML = setsDataCache.map(set => `
         <div class="border border-slate-700/80 rounded-xl overflow-hidden bg-slate-900/50">
-          <!-- 扩展包 Header (点击展开/折叠) -->
           <button 
             onclick="toggleSetFolder('${set.setId}')"
             class="w-full px-4 py-3 bg-slate-800/80 hover:bg-slate-700/80 flex justify-between items-center text-left transition"
@@ -191,7 +192,6 @@
             </span>
           </button>
 
-          <!-- 扩展包卡牌列表网格 (默认隐藏) -->
           <div id="folder-${set.setId}" class="hidden p-4 bg-slate-950/40 border-t border-slate-800">
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               ${set.cards.map(card => `
@@ -277,7 +277,7 @@
     }
 
     function updateTradeUI() {
-      document.getElementById('rarityBadge').innerHTML = selectedRarity ? `<span class="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">已锁定: ${selectedRarity}</span>` : '';
+      document.getElementById('rarityBadge').innerHTML = selectedRarityLabel ? `<span class="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">${selectedRarityLabel}</span>` : '';
 
       document.getElementById('wantList').innerHTML = wantCards.length ? wantCards.map(c => `
         <div class="flex justify-between items-center bg-slate-800 p-1.5 rounded-lg border border-slate-700">
@@ -308,7 +308,7 @@
 
     function exportTradePost() {
       if (!haveCards.length && !wantCards.length) return alert('请先添加卡牌！');
-      let text = `[Pokémon TCG Pocket Trade] (${selectedRarity})\n\n🟡 WANT:\n` + 
+      let text = `[Pokémon TCG Pocket Trade] (${selectedRarityLabel})\n\n🟡 WANT:\n` + 
         (wantCards.map(c => `- ${c.name} [#${c.id}]`).join('\n') || '- None') + 
         `\n\n🟢 HAVE:\n` + 
         (haveCards.map(c => `- ${c.name} [#${c.id}]`).join('\n') || '- None');
