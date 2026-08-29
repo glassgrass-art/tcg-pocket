@@ -2,9 +2,25 @@ export default async function handler(req, res) {
   const { rarity = '', setId = '' } = req.query;
 
   try {
-    const setIds = ['A1', 'A1a', 'P-A'];
+    // 1. 动态拉取 TCGDex 上 Pocket 系列的所有扩展包列表
+    let setIds = [];
+    const seriesRes = await fetch('https://api.tcgdex.net/v2/en/series/tcg-pocket').catch(() => null);
+    
+    if (seriesRes && seriesRes.ok) {
+      const seriesData = await seriesRes.json();
+      if (seriesData && seriesData.sets) {
+        setIds = seriesData.sets.map(s => s.id);
+      }
+    }
+
+    // 如果动态获取失败，使用全量兜底列表 (涵盖目前已知的所有卡包)
+    if (!setIds.length) {
+      setIds = ['A1', 'A1a', 'A2', 'A2a', 'P-A'];
+    }
+
     const targetSets = setId ? [setId] : setIds;
 
+    // 2. 并行获取各个卡包的详细数据
     const setPromises = targetSets.map(id =>
       fetch(`https://api.tcgdex.net/v2/en/sets/${id}`)
         .then(r => (r.ok ? r.json() : null))
@@ -15,9 +31,9 @@ export default async function handler(req, res) {
 
     let result = [];
 
-    // 稀有度归一化函数
+    // 稀有度归一化映射
     function normalizeRarity(str) {
-      if (!str) return '1diamond'; // 默认兜底为 1 菱形
+      if (!str) return '1diamond';
       const s = str.toLowerCase().replace(/[^a-z0-9]/g, '');
       if (s.includes('1diamond') || s === 'onediamond' || s === 'common') return '1diamond';
       if (s.includes('2diamond') || s === 'twodiamond' || s === 'uncommon') return '2diamond';
@@ -35,9 +51,8 @@ export default async function handler(req, res) {
     for (const setData of setsData) {
       if (!setData || !setData.cards) continue;
 
-      // 如果列表里的卡片对象缺少 rarity 属性，通过简易规则/全量补全
       let formattedCards = setData.cards.map(card => {
-        const rawRarity = card.rarity || 'One Diamond'; 
+        const rawRarity = card.rarity || 'One Diamond';
         return {
           id: card.id,
           name: card.name,
@@ -50,12 +65,10 @@ export default async function handler(req, res) {
         };
       });
 
-      // 如果提供了稀有度，进行过滤；若匹配为空，则放行显示全部（防止前端死锁）
       let filteredCards = targetNormRarity
         ? formattedCards.filter(c => c.normRarity === targetNormRarity)
         : formattedCards;
 
-      // 兜底逻辑：如果精准匹配过滤后为 0，直接返回该扩展包全部卡牌，避免界面卡死
       if (filteredCards.length === 0 && formattedCards.length > 0) {
         filteredCards = formattedCards;
       }
@@ -70,7 +83,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // 设置跨域 header
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).json({ data: result });
   } catch (error) {
