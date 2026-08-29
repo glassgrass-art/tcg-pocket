@@ -3,46 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pokémon TCG Pocket 卡牌库</title>
+  <title>Pokémon TCG Pocket 卡牌库 & 组牌器</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen p-6">
-  <div class="max-w-5xl mx-auto">
-    <!-- 头部标语 -->
-    <header class="mb-8 text-center">
-      <h1 class="text-3xl font-bold tracking-wide text-yellow-400">Pokémon TCG Pocket Database</h1>
-      <p class="text-slate-400 mt-2">专为 Pocket 手游打造的轻量卡牌检索工具</p>
+  <div class="max-w-7xl mx-auto">
+    <!-- 头部 -->
+    <header class="mb-6 text-center">
+      <h1 class="text-3xl font-bold tracking-wide text-yellow-400">Pokémon TCG Pocket Deck Builder</h1>
+      <p class="text-slate-400 mt-1">检索卡牌并构建你的 20 张 Pocket 卡组</p>
     </header>
 
-    <!-- 筛选控制面板 -->
-    <div class="flex flex-col sm:flex-row gap-4 mb-8">
-      <input 
-        type="text" 
-        id="searchInput" 
-        placeholder="搜索卡牌名称 (如 Pikachu)..." 
-        class="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-yellow-400"
-      />
-      <select 
-        id="typeSelect" 
-        class="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-yellow-400"
-      >
-        <option value="">全部属性 (All Types)</option>
-        <option value="Lightning">电 (Lightning)</option>
-        <option value="Darkness">恶 (Darkness)</option>
-        <option value="Water">水 (Water)</option>
-        <option value="Fire">火 (Fire)</option>
-        <option value="Grass">草 (Grass)</option>
-        <option value="Fighting">斗 (Fighting)</option>
-        <option value="Psychic">超 (Psychic)</option>
-        <option value="Metal">钢 (Metal)</option>
-        <option value="Colorless">无 (Colorless)</option>
-        <option value="Trainer">训练家 (Trainer)</option>
-      </select>
-    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- 左侧：卡牌检索与列表 (占 2 列) -->
+      <div class="lg:col-span-2">
+        <!-- 筛选控制栏 -->
+        <div class="flex flex-col sm:flex-row gap-4 mb-6">
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="搜索卡牌名称..." 
+            class="flex-1 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-yellow-400"
+          />
+          <select 
+            id="typeSelect" 
+            class="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-yellow-400"
+          >
+            <option value="">全部属性</option>
+            <option value="Lightning">电 (Lightning)</option>
+            <option value="Darkness">恶 (Darkness)</option>
+            <option value="Trainer">训练家 (Trainer)</option>
+          </select>
+        </div>
 
-    <!-- 卡牌网格展示区 -->
-    <div id="cardsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-      <p class="text-slate-500 col-span-full text-center py-8">正在加载卡牌数据...</p>
+        <!-- 卡牌网格 -->
+        <div id="cardsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+      </div>
+
+      <!-- 右侧：卡组构筑面板 (占 1 列) -->
+      <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 h-fit sticky top-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-yellow-400">当前卡组</h2>
+          <span id="deckCount" class="text-sm font-bold bg-slate-700 px-3 py-1 rounded-full text-slate-300">0 / 20</span>
+        </div>
+
+        <!-- 极简卡组列表 -->
+        <div id="deckList" class="space-y-2 mb-6 min-h-[200px] max-h-[400px] overflow-y-auto">
+          <p class="text-slate-500 text-center py-12 text-sm">点击左侧卡牌的“+”添加至卡组</p>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="space-y-2">
+          <button 
+            id="exportBtn" 
+            onclick="exportDeck()" 
+            class="w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold rounded-lg transition"
+          >
+            导出卡组代码
+          </button>
+          <button 
+            onclick="clearDeck()" 
+            class="w-full py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-lg transition"
+          >
+            清空卡组
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -50,8 +76,11 @@
     const searchInput = document.getElementById('searchInput');
     const typeSelect = document.getElementById('typeSelect');
     const cardsGrid = document.getElementById('cardsGrid');
+    const deckList = document.getElementById('deckList');
+    const deckCount = document.getElementById('deckCount');
 
-    // 从我们刚才搭建的 API 拉取数据
+    let currentDeck = []; // 保存选中的卡牌
+
     async function fetchCards() {
       const search = searchInput.value.trim();
       const type = typeSelect.value;
@@ -59,67 +88,110 @@
       let url = '/api/cards?';
       if (search) url += `search=${encodeURIComponent(search)}&`;
       if (type) {
-        if (type === 'Trainer') {
-          url += `card_type=Trainer&`;
-        } else {
-          url += `type=${encodeURIComponent(type)}&`;
-        }
+        if (type === 'Trainer') url += `card_type=Trainer&`;
+        else url += `type=${encodeURIComponent(type)}&`;
       }
 
-      try {
-        const res = await fetch(url);
-        const result = await res.json();
-        renderCards(result.data || []);
-      } catch (err) {
-        cardsGrid.innerHTML = `<p class="text-red-400 col-span-full text-center">数据加载失败，请重试。</p>`;
-      }
+      const res = await fetch(url);
+      const result = await res.json();
+      renderCards(result.data || []);
     }
 
-    // 渲染卡牌 HTML
     function renderCards(cards) {
-      if (cards.length === 0) {
-        cardsGrid.innerHTML = `<p class="text-slate-500 col-span-full text-center py-8">未找到匹配的卡牌</p>`;
-        return;
-      }
-
       cardsGrid.innerHTML = cards.map(card => `
-        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 hover:border-yellow-400 transition shadow-lg flex flex-col justify-between">
+        <div class="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col justify-between">
           <div>
             <div class="flex justify-between items-start mb-2">
-              <h2 class="text-xl font-bold text-white">${card.name}</h2>
-              <span class="text-xs px-2 py-1 rounded font-semibold ${card.type === 'Lightning' ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40' : 'bg-slate-700 text-slate-300'}">
-                ${card.type || card.card_type}
-              </span>
+              <h3 class="font-bold text-white">${card.name}</h3>
+              <button 
+                onclick='addToDeck(${JSON.stringify(card).replace(/'/g, "&apos;")})'
+                class="px-2.5 py-1 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-slate-900 rounded font-bold text-xs transition"
+              >
+                + 加入
+              </button>
             </div>
-            
-            ${card.hp ? `<p class="text-sm text-slate-400 mb-3">HP: <span class="text-slate-200 font-bold">${card.hp}</span> ${card.stage ? `| ${card.stage}` : ''}</p>` : ''}
-
-            <div class="space-y-2 mb-4">
-              ${card.attacks ? card.attacks.map(atk => `
-                <div class="bg-slate-900/60 p-2.5 rounded border border-slate-800">
-                  <div class="flex justify-between font-semibold text-sm">
-                    <span class="text-yellow-400">${atk.name}</span>
-                    <span class="text-slate-300">${atk.damage}</span>
-                  </div>
-                  <p class="text-xs text-slate-400 mt-1">${atk.text}</p>
-                </div>
-              `).join('') : `<p class="text-sm text-slate-300 bg-slate-900/60 p-2.5 rounded">${card.text}</p>`}
-            </div>
+            <p class="text-xs text-slate-400 mb-2">${card.type || card.card_type} ${card.hp ? `| HP ${card.hp}` : ''}</p>
           </div>
-
-          <div class="pt-3 border-t border-slate-700/50 flex justify-between text-xs text-slate-500">
-            <span>稀有度: ${card.rarity || '标准'}</span>
-            <span>编号: ${card.id}</span>
+          <div class="text-xs text-slate-500 flex justify-between pt-2 border-t border-slate-700/50">
+            <span>${card.rarity || '标准'}</span>
+            <span>${card.id}</span>
           </div>
         </div>
       `).join('');
     }
 
-    // 事件监听
+    // 添加卡牌到卡组
+    function addToDeck(card) {
+      const totalCards = currentDeck.reduce((sum, item) => sum + item.count, 0);
+      if (totalCards >= 20) {
+        alert('Pocket 卡组上限为 20 张！');
+        return;
+      }
+
+      const existing = currentDeck.find(item => item.id === card.id);
+      if (existing) {
+        if (existing.count >= 2) {
+          alert('Pocket 规则：同名卡最多只能携带 2 张！');
+          return;
+        }
+        existing.count += 1;
+      } else {
+        currentDeck.push({ ...card, count: 1 });
+      }
+      updateDeckUI();
+    }
+
+    // 从卡组移除
+    function removeFromDeck(id) {
+      const existing = currentDeck.find(item => item.id === id);
+      if (existing) {
+        if (existing.count > 1) {
+          existing.count -= 1;
+        } else {
+          currentDeck = currentDeck.filter(item => item.id !== id);
+        }
+      }
+      updateDeckUI();
+    }
+
+    // 清空
+    function clearDeck() {
+      currentDeck = [];
+      updateDeckUI();
+    }
+
+    // 更新卡组 UI
+    function updateDeckUI() {
+      const totalCards = currentDeck.reduce((sum, item) => sum + item.count, 0);
+      deckCount.textContent = `${totalCards} / 20`;
+
+      if (currentDeck.length === 0) {
+        deckList.innerHTML = `<p class="text-slate-500 text-center py-12 text-sm">点击左侧卡牌的“+”添加至卡组</p>`;
+        return;
+      }
+
+      deckList.innerHTML = currentDeck.map(item => `
+        <div class="flex justify-between items-center bg-slate-900 p-2.5 rounded border border-slate-700 text-sm">
+          <span class="font-medium text-slate-200">${item.name} <span class="text-yellow-400 font-bold">x${item.count}</span></span>
+          <button onclick="removeFromDeck('${item.id}')" class="text-red-400 hover:text-red-300 text-xs px-2 py-1">删除</button>
+        </div>
+      `).join('');
+    }
+
+    // 导出卡组代码
+    function exportDeck() {
+      const totalCards = currentDeck.reduce((sum, item) => sum + item.count, 0);
+      if (totalCards === 0) {
+        alert('卡组为空！');
+        return;
+      }
+      const code = currentDeck.map(item => `${item.name} x${item.count}`).join('\n');
+      navigator.clipboard.writeText(code);
+      alert(`卡组代码已复制到剪贴板！\n\n${code}`);
+    }
+
     searchInput.addEventListener('input', fetchCards);
     typeSelect.addEventListener('change', fetchCards);
-
-    // 初始化运行
     fetchCards();
   </script>
 </body>
