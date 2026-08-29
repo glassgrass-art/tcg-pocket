@@ -1,0 +1,57 @@
+[
+  {
+    "id": "A1-001",
+    "name": "Pikachu ex",
+    "type": "Lightning",
+    "card_type": "Pokémon",
+    "stage": "Basic",
+    "hp": 120,
+    "ex_rule": true,
+    "attacks": [
+      {
+        "name": "Circle Circuit",
+        "cost": ["Lightning", "Lightning"],
+        "damage": "30x",
+        "text": "Deals 30 damage times the number of your Benched Lightning Pokémon."
+      }
+    ],
+    "weakness": "Fighting",
+    "retreat_cost": 1,
+    "pack": "Genetic Apex - Pikachu",
+    "rarity": "4-Diamond",
+    "image": "https://images.pokemontcg.io/sv3pt5/25_hires.png"
+  },
+  {
+    "id": "A1-045",
+    "name": "Zoroark ex",
+    "type": "Darkness",
+    "card_type": "Pokémon",
+    "stage": "Stage 1",
+    "evolves_from": "Zorua",
+    "hp": 150,
+    "ex_rule": true,
+    "attacks": [
+      {
+        "name": "Nasty Plot",
+        "cost": ["Darkness"],
+        "damage": "30",
+        "text": "Search your deck for any 1 card and put it into your hand."
+      }
+    ],
+    "weakness": "Fighting",
+    "retreat_cost": 1,
+    "pack": "Genetic Apex",
+    "rarity": "4-Diamond",
+    "image": "https://images.pokemontcg.io/swsh11/92_hires.png"
+  },
+  {
+    "id": "A1-180",
+    "name": "Professor's Research",
+    "type": "Trainer",
+    "card_type": "Supporter",
+    "text": "Draw 2 cards.",
+    "pack": "Genetic Apex",
+    "rarity": "2-Diamond",
+    "image": "https://images.pokemontcg.io/cel25/24_hires.png"
+  }
+]
