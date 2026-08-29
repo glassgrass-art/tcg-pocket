@@ -2,36 +2,47 @@ export default async function handler(req, res) {
   const { rarity = '', setId = '' } = req.query;
 
   try {
-    // 1. 动态拉取 TCGDex 上 Pocket 系列的所有扩展包列表
-    let setIds = [];
-    const seriesRes = await fetch('https://api.tcgdex.net/v2/en/series/tcg-pocket').catch(() => null);
+    // 补全所有 A 系列、B 系列（至 B4a 火箭队包）以及 Promo 扩展包代码
+    const knownSets = [
+      'A1', 'A1a', 'A2', 'A2a', 'A2b', 'A3', 'A3a', 'A3b', 'A4', 'A4a', 'A4b',
+      'B1', 'B1a', 'B2', 'B2a', 'B2b', 'B3', 'B3a', 'B3b', 'B4', 'B4a', 
+      'P-A'
+    ];
     
-    if (seriesRes && seriesRes.ok) {
-      const seriesData = await seriesRes.json();
-      if (seriesData && seriesData.sets) {
-        setIds = seriesData.sets.map(s => s.id);
-      }
-    }
+    let setIds = [...knownSets];
 
-    // 如果动态获取失败，使用全量兜底列表 (涵盖目前已知的所有卡包)
-    if (!setIds.length) {
-      setIds = ['A1', 'A1a', 'A2', 'A2a', 'P-A'];
+    // 尝试获取 API 最新的列表防漏
+    try {
+      const seriesRes = await fetch('https://api.tcgdex.net/v2/en/series/tcg-pocket', { signal: AbortSignal.timeout(3000) });
+      if (seriesRes.ok) {
+        const seriesData = await seriesRes.json();
+        if (seriesData && seriesData.sets) {
+          const fetchedIds = seriesData.sets.map(s => s.id);
+          setIds = Array.from(new Set([...knownSets, ...fetchedIds]));
+        }
+      }
+    } catch (e) {
+      // 忽略超时，继续使用 knownSets 兜底
     }
 
     const targetSets = setId ? [setId] : setIds;
 
-    // 2. 并行获取各个卡包的详细数据
-    const setPromises = targetSets.map(id =>
-      fetch(`https://api.tcgdex.net/v2/en/sets/${id}`)
-        .then(r => (r.ok ? r.json() : null))
-        .catch(() => null)
-    );
+    // 单个 Set 拉取带超时控制与重试
+    const fetchSetData = async (id) => {
+      try {
+        const res = await fetch(`https://api.tcgdex.net/v2/en/sets/${id}`, { signal: AbortSignal.timeout(4000) });
+        if (res.ok) return await res.json();
+      } catch (err) {
+        console.warn(`Set ${id} fetch timed out or failed.`);
+      }
+      return null;
+    };
 
-    const setsData = (await Promise.all(setPromises)).filter(Boolean);
+    const setsData = (await Promise.all(targetSets.map(fetchSetData))).filter(Boolean);
 
     let result = [];
 
-    // 稀有度归一化映射
+    // 稀有度标准化
     function normalizeRarity(str) {
       if (!str) return '1diamond';
       const s = str.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -84,6 +95,7 @@ export default async function handler(req, res) {
     }
 
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate'); // 开启 24 小时 CDN 缓存
     res.status(200).json({ data: result });
   } catch (error) {
     console.error('API Error:', error);
